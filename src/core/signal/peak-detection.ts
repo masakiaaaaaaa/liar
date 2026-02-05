@@ -1,6 +1,7 @@
 /**
- * Improved Peak Detector for PPG Signal
- * Uses adaptive thresholding and slope-based detection with sub-sample refinement
+ * Simple Peak Detector for PPG Signal
+ * Uses pure slope-based detection (no amplitude threshold)
+ * Detects local maxima where slope changes from positive to negative.
  */
 export interface Peak {
     timestamp: number;
@@ -12,47 +13,24 @@ export class PeakDetector {
     private readonly MIN_INTERVAL_MS = 300; // 200 BPM max
     private readonly MAX_INTERVAL_MS = 1500; // 40 BPM min
 
-    // Adaptive threshold parameters
-    private signalMax = -Infinity;
-    private signalMin = Infinity;
-    private adaptiveThreshold = 0;
-
     // State machine for peak detection
-    private state: 'LOOKING' | 'RISING' | 'FALLING' = 'LOOKING';
+    private state: 'LOOKING' | 'RISING' | 'CONFIRMED' = 'LOOKING';
     private localMax = -Infinity;
     private localMaxTime = 0;
     private prevValue = 0;
     private prevPrevValue = 0;
-
-    // Running statistics
-    private peakHistory: number[] = [];
-    private readonly HISTORY_SIZE = 5;
-    private sampleCount = 0; // Tracks samples for warm-up
+    private sampleCount = 0;
+    private risingCount = 0; // Track how long we've been rising
 
     detect(value: number, timestamp: number): Peak | null {
         this.sampleCount++;
 
-        // Skip first 60 samples (~2s) to allow min/max to stabilize
-        if (this.sampleCount < 60) {
+        // Skip first 30 samples (~1s) to allow signal to stabilize
+        if (this.sampleCount < 30) {
             this.prevPrevValue = this.prevValue;
             this.prevValue = value;
-            if (value > this.signalMax) this.signalMax = value;
-            if (value < this.signalMin) this.signalMin = value;
             return null;
         }
-
-        // Update running min/max for adaptive threshold
-        if (value > this.signalMax) this.signalMax = value;
-        if (value < this.signalMin) this.signalMin = value;
-
-        // Slowly decay min/max to adapt to signal changes
-        const range = this.signalMax - this.signalMin;
-        this.signalMax -= range * 0.001;
-        this.signalMin += range * 0.001;
-
-        // Adaptive threshold: Just above midpoint (was too high before)
-        const midpoint = (this.signalMax + this.signalMin) / 2;
-        this.adaptiveThreshold = midpoint + range * 0.05;
 
         // Calculate slope (derivative)
         const slope = value - this.prevValue;
@@ -67,15 +45,18 @@ export class PeakDetector {
 
         switch (this.state) {
             case 'LOOKING':
-                // Looking for signal to rise above threshold
-                if (value > this.adaptiveThreshold && slope > 0) {
+                // Looking for signal to start rising (positive slope)
+                if (slope > 0) {
                     this.state = 'RISING';
                     this.localMax = value;
                     this.localMaxTime = timestamp;
+                    this.risingCount = 1;
                 }
                 break;
 
             case 'RISING':
+                this.risingCount++;
+
                 // Track the maximum while rising
                 if (value > this.localMax) {
                     this.localMax = value;
@@ -83,57 +64,33 @@ export class PeakDetector {
                 }
 
                 // Detect peak when slope turns negative (after positive)
-                if (slope < 0 && prevSlope >= 0) {
-                    // Apply sub-sample refinement using quadratic interpolation
-                    const dt = 33.33; // Approx sample interval at 30Hz
-                    const y1 = this.prevPrevValue;
-                    const y2 = this.prevValue;
-                    const y3 = value;
-
-                    const denom = 2 * (y1 - 2 * y2 + y3);
-                    if (Math.abs(denom) > 0.0001) {
-                        const offset = (y1 - y3) / denom;
-                        const clampedOffset = Math.max(-0.5, Math.min(0.5, offset));
-                        this.localMax = y2 - 0.25 * (y1 - y3) * clampedOffset;
-                        this.localMaxTime = (timestamp - dt) + (clampedOffset * dt);
-                    } else {
-                        this.localMax = y2;
-                        this.localMaxTime = timestamp - dt;
-                    }
-
-                    this.state = 'FALLING';
-                }
-                break;
-
-            case 'FALLING':
-                // Confirm peak when signal drops significantly (RELAXED from 0.7 to 0.85)
-                if (value < this.localMax * 0.85 || value < this.adaptiveThreshold) {
-                    // Check minimum interval
+                // Require at least 2 rising samples to filter noise
+                if (slope < 0 && prevSlope >= 0 && this.risingCount >= 2) {
+                    // Peak found! Now we need to confirm it by checking interval
                     const interval = this.localMaxTime - this.lastPeakTime;
-                    if (interval > this.MIN_INTERVAL_MS) {
+
+                    if (interval > this.MIN_INTERVAL_MS || this.lastPeakTime === 0) {
                         // Valid peak detected!
                         detectedPeak = { timestamp: this.localMaxTime, value: this.localMax };
                         this.lastPeakTime = this.localMaxTime;
-
-                        // Store in history for validation
-                        this.peakHistory.push(this.localMax);
-                        if (this.peakHistory.length > this.HISTORY_SIZE) {
-                            this.peakHistory.shift();
-                        }
                     }
+
                     this.state = 'LOOKING';
                     this.localMax = -Infinity;
+                    this.risingCount = 0;
                 }
-                // Timeout: if stuck in FALLING for too long, reset
-                if (timestamp - this.localMaxTime > 500) {
+
+                // Timeout: if rising for too long without peak, reset
+                if (this.risingCount > 45) { // ~1.5s at 30Hz - something wrong
                     this.state = 'LOOKING';
+                    this.risingCount = 0;
                 }
                 break;
         }
 
-        // Timeout: if no peak detected for too long, reset state
-        if (timestamp - this.lastPeakTime > this.MAX_INTERVAL_MS && this.state !== 'LOOKING') {
-            this.state = 'LOOKING';
+        // Timeout: if no peak detected for too long, allow any new peak
+        if (timestamp - this.lastPeakTime > this.MAX_INTERVAL_MS) {
+            // Don't reset state, but allow next peak regardless of interval
         }
 
         return detectedPeak;
@@ -141,13 +98,12 @@ export class PeakDetector {
 
     reset() {
         this.lastPeakTime = 0;
-        this.signalMax = -Infinity;
-        this.signalMin = Infinity;
         this.state = 'LOOKING';
         this.localMax = -Infinity;
+        this.localMaxTime = 0;
         this.prevValue = 0;
         this.prevPrevValue = 0;
-        this.peakHistory = [];
         this.sampleCount = 0;
+        this.risingCount = 0;
     }
 }

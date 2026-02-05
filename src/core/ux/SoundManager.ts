@@ -105,14 +105,15 @@ export const SoundManager = {
     },
 
     /**
-     * Start tension-building BGM (Heartbeat Style)
-     * Simple, clear "Dokun-Dokun" (ドキドキ) heartbeat sound with accelerating tempo.
+     * Start tension-building BGM (Rich Heartbeat Style)
+     * Layered "Dokun-Dokun" with sub-bass, mid-thump, and high reverb tail.
+     * Accelerating tempo + rising sub-bass for cinematic tension.
      */
     startTensionBGM: () => {
         try {
             const ctx = getAudioContext();
             const master = ctx.createGain();
-            master.gain.setValueAtTime(0.4, ctx.currentTime);
+            master.gain.setValueAtTime(0.5, ctx.currentTime);
             master.connect(ctx.destination);
 
             const oscs: OscillatorNode[] = [];
@@ -120,43 +121,99 @@ export const SoundManager = {
             const now = ctx.currentTime;
             const duration = 20.0; // 20 seconds BGM
 
-            // --- HEARTBEAT PATTERN ---
+            // --- RICH HEARTBEAT PATTERN ---
             // A heartbeat is "Lub-Dub" (two thumps close together)
-            // Tempo starts slow (~60 BPM) and accelerates to ~120 BPM
+            // Layered with:
+            // 1. Sub-bass thump (30-50Hz) - "feel" it
+            // 2. Mid thump (80-120Hz) - "hear" it
+            // 3. High click/transient (200Hz) - "attack" feel
+            // + Subtle reverb/delay via overlapping tails
 
             let beatTime = now;
             let beatInterval = 1.0; // Start at 60 BPM (1 beat per second)
 
-            while (beatTime < now + duration) {
-                // --- "Lub" (First thump) ---
-                const lub = ctx.createOscillator();
-                const lubGain = ctx.createGain();
-                lub.type = 'sine';
-                lub.frequency.setValueAtTime(60, beatTime);
-                lub.frequency.exponentialRampToValueAtTime(30, beatTime + 0.15);
-                lubGain.gain.setValueAtTime(0.7, beatTime);
-                lubGain.gain.exponentialRampToValueAtTime(0.001, beatTime + 0.2);
-                lub.connect(lubGain);
-                lubGain.connect(master);
-                lub.start(beatTime);
-                lub.stop(beatTime + 0.25);
+            // Rising sub-bass drone that builds tension
+            const subDrone = ctx.createOscillator();
+            const subDroneGain = ctx.createGain();
+            subDrone.type = 'sine';
+            subDrone.frequency.setValueAtTime(30, now);
+            subDrone.frequency.linearRampToValueAtTime(50, now + duration);
+            subDroneGain.gain.setValueAtTime(0.15, now);
+            subDroneGain.gain.linearRampToValueAtTime(0.3, now + duration);
+            subDrone.connect(subDroneGain);
+            subDroneGain.connect(master);
+            subDrone.start(now);
+            subDrone.stop(now + duration);
+            oscs.push(subDrone);
 
-                // --- "Dub" (Second thump, slightly higher, after short pause) ---
-                const dubTime = beatTime + 0.15; // 150ms after first thump
-                const dub = ctx.createOscillator();
-                const dubGain = ctx.createGain();
-                dub.type = 'sine';
-                dub.frequency.setValueAtTime(50, dubTime);
-                dub.frequency.exponentialRampToValueAtTime(25, dubTime + 0.1);
-                dubGain.gain.setValueAtTime(0.5, dubTime);
-                dubGain.gain.exponentialRampToValueAtTime(0.001, dubTime + 0.15);
-                dub.connect(dubGain);
-                dubGain.connect(master);
-                dub.start(dubTime);
-                dub.stop(dubTime + 0.2);
+            while (beatTime < now + duration) {
+                // --- Layer 1: Sub-Bass Thump (30Hz drop) ---
+                const subBass = ctx.createOscillator();
+                const subGain = ctx.createGain();
+                subBass.type = 'sine';
+                subBass.frequency.setValueAtTime(50, beatTime);
+                subBass.frequency.exponentialRampToValueAtTime(25, beatTime + 0.2);
+                subGain.gain.setValueAtTime(0.6, beatTime);
+                subGain.gain.exponentialRampToValueAtTime(0.001, beatTime + 0.3);
+                subBass.connect(subGain);
+                subGain.connect(master);
+                subBass.start(beatTime);
+                subBass.stop(beatTime + 0.35);
+
+                // --- Layer 2: Mid Thump (80Hz - the "body") ---
+                const midThump = ctx.createOscillator();
+                const midGain = ctx.createGain();
+                midThump.type = 'triangle';
+                midThump.frequency.setValueAtTime(80, beatTime);
+                midThump.frequency.exponentialRampToValueAtTime(40, beatTime + 0.15);
+                midGain.gain.setValueAtTime(0.4, beatTime);
+                midGain.gain.exponentialRampToValueAtTime(0.001, beatTime + 0.25);
+                midThump.connect(midGain);
+                midGain.connect(master);
+                midThump.start(beatTime);
+                midThump.stop(beatTime + 0.3);
+
+                // --- Layer 3: High Click (Attack Transient) ---
+                const click = ctx.createOscillator();
+                const clickGain = ctx.createGain();
+                click.type = 'square';
+                click.frequency.value = 200;
+                clickGain.gain.setValueAtTime(0.15, beatTime);
+                clickGain.gain.exponentialRampToValueAtTime(0.001, beatTime + 0.03);
+                click.connect(clickGain);
+                clickGain.connect(master);
+                click.start(beatTime);
+                click.stop(beatTime + 0.05);
+
+                // --- "Dub" (Second thump, slightly softer, 150ms after) ---
+                const dubTime = beatTime + 0.15;
+
+                const dubSub = ctx.createOscillator();
+                const dubSubGain = ctx.createGain();
+                dubSub.type = 'sine';
+                dubSub.frequency.setValueAtTime(40, dubTime);
+                dubSub.frequency.exponentialRampToValueAtTime(20, dubTime + 0.15);
+                dubSubGain.gain.setValueAtTime(0.4, dubTime);
+                dubSubGain.gain.exponentialRampToValueAtTime(0.001, dubTime + 0.2);
+                dubSub.connect(dubSubGain);
+                dubSubGain.connect(master);
+                dubSub.start(dubTime);
+                dubSub.stop(dubTime + 0.25);
+
+                const dubMid = ctx.createOscillator();
+                const dubMidGain = ctx.createGain();
+                dubMid.type = 'triangle';
+                dubMid.frequency.setValueAtTime(60, dubTime);
+                dubMid.frequency.exponentialRampToValueAtTime(30, dubTime + 0.1);
+                dubMidGain.gain.setValueAtTime(0.3, dubTime);
+                dubMidGain.gain.exponentialRampToValueAtTime(0.001, dubTime + 0.15);
+                dubMid.connect(dubMidGain);
+                dubMidGain.connect(master);
+                dubMid.start(dubTime);
+                dubMid.stop(dubTime + 0.2);
 
                 // Accelerate the tempo
-                beatInterval = Math.max(0.5, beatInterval * 0.95); // Minimum ~120 BPM
+                beatInterval = Math.max(0.45, beatInterval * 0.94); // Minimum ~130 BPM
                 beatTime += beatInterval;
             }
 
