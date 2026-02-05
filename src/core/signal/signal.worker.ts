@@ -257,7 +257,8 @@ self.onmessage = (event: MessageEvent<WorkerMessage>) => {
                 payload: {
                     bpm: Math.round(bpm),
                     confidence: Math.round(confidence),
-                    rmssd // Now strictly real
+                    rmssd,
+                    peakCount: peaks.length // Now strictly real
                 }
             };
             self.postMessage(responseBpm);

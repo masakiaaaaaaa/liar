@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { TruthResult } from '../../core/analysis/truthMetric';
 
@@ -6,11 +6,14 @@ interface ResultCardProps {
     result: TruthResult;
     bpm: number;
     rmssd: number;
+    peakCount: number;
+    confidence: number;
     onRestart: () => void;
 }
 
-export const ResultCard: React.FC<ResultCardProps> = ({ result, bpm, rmssd, onRestart }) => {
+export const ResultCard: React.FC<ResultCardProps> = ({ result, bpm, rmssd, peakCount, confidence, onRestart }) => {
     const { t, i18n } = useTranslation();
+    const [showDetails, setShowDetails] = useState(false);
 
     const isLie = result.label === 'LIE';
 
@@ -99,12 +102,12 @@ export const ResultCard: React.FC<ResultCardProps> = ({ result, bpm, rmssd, onRe
                 {isLie ? t('result.lie_msg') : t('result.truth_msg')}
             </p>
 
-            {/* Stats */}
+            {/* Stats Overview */}
             <div style={{
                 display: 'grid',
                 gridTemplateColumns: '1fr 1fr',
                 gap: 'var(--space-sm)',
-                marginBottom: 'var(--space-lg)',
+                marginBottom: 'var(--space-md)',
             }}>
                 <div style={{
                     padding: 'var(--space-md)',
@@ -141,6 +144,54 @@ export const ResultCard: React.FC<ResultCardProps> = ({ result, bpm, rmssd, onRe
                     </p>
                 </div>
             </div>
+
+            {/* Details Toggle */}
+            <button
+                onClick={() => setShowDetails(!showDetails)}
+                style={{
+                    background: 'transparent',
+                    border: 'none',
+                    color: 'var(--color-text-muted)',
+                    fontSize: '12px',
+                    textDecoration: 'underline',
+                    cursor: 'pointer',
+                    marginBottom: 'var(--space-md)',
+                    opacity: 0.8
+                }}
+            >
+                {showDetails ? (i18n.language === 'ja' ? '詳細を隠す' : 'Hide Details') : (i18n.language === 'ja' ? '詳細を表示' : 'Show Details')}
+            </button>
+
+            {/* Detailed Stats Panel */}
+            {showDetails && (
+                <div className="animate-fadeIn" style={{
+                    background: '#f1f5f9',
+                    padding: 'var(--space-md)',
+                    borderRadius: 'var(--radius-md)',
+                    marginBottom: 'var(--space-lg)',
+                    fontSize: '12px',
+                    color: 'var(--color-text-secondary)',
+                    textAlign: 'left',
+                    boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.05)'
+                }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                        <span>平均心拍数 (Avg BPM):</span>
+                        <strong>{bpm.toFixed(0)} bpm</strong>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                        <span>心拍変動 (RMSSD):</span>
+                        <strong>{rmssd.toFixed(1)} ms</strong>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                        <span>検出ピーク数 (Peaks):</span>
+                        <strong>{peakCount} peaks</strong>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span>信号信頼度 (Confidence):</span>
+                        <strong>{confidence.toFixed(1)}%</strong>
+                    </div>
+                </div>
+            )}
 
             {/* Buttons */}
             <div style={{ display: 'flex', gap: 'var(--space-sm)' }}>

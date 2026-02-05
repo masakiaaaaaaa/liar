@@ -105,103 +105,98 @@ export const SoundManager = {
     },
 
     /**
-     * Start tension-building BGM (Rich Orchestral Tension)
-     * "Hans Zimmer" style: Cello drone, Tremolo Strings, Deep Pulse
+     * Start tension-building BGM (TV Game Show Style)
+     * "Millionaire" thinking music style: Electronic tick + Synth Pad
      */
     startTensionBGM: () => {
         try {
             const ctx = getAudioContext();
             const master = ctx.createGain();
-            // Start quiet and fade in slowly
-            master.gain.setValueAtTime(0.001, ctx.currentTime);
-            master.gain.exponentialRampToValueAtTime(0.4, ctx.currentTime + 3.0);
+            master.gain.setValueAtTime(0.4, ctx.currentTime);
             master.connect(ctx.destination);
 
             const oscs: OscillatorNode[] = [];
-            const gains: GainNode[] = []; // Keep track to stop
 
             const now = ctx.currentTime;
-            const duration = 16.0; // Play slightly longer than scan
 
-            // 1. Low Cello Drone (Sawtooth + Lowpass)
-            // Provides the "guts" of the sound
-            const cello1 = ctx.createOscillator();
-            const cello2 = ctx.createOscillator();
-            const celloGain = ctx.createGain();
-            const celloFilter = ctx.createBiquadFilter();
+            // 1. The Clock Tick (Filtered Noise or High Hat)
+            // We'll use a loop of scheduled beeps rather than a continuous LFO primarily
+            // because we want it to sound "electronic" and precise.
 
-            cello1.type = 'sawtooth';
-            cello1.frequency.value = 55.00; // A1
-            cello2.type = 'sawtooth';
-            cello2.frequency.value = 55.35; // Slight detune for "width"
+            let time = now;
+            let interval = 1.0; // Seconds
 
-            celloFilter.type = 'lowpass';
-            celloFilter.frequency.value = 250;
-            celloFilter.Q.value = 1;
+            // Loop ticks for 20s
+            while (time < now + 20) {
+                const tick = ctx.createOscillator();
+                const tickGain = ctx.createGain();
 
-            celloGain.gain.value = 0.3;
+                tick.type = 'square'; // Digital sound
+                tick.frequency.value = 800; // High pitch click
 
-            cello1.connect(celloFilter);
-            cello2.connect(celloFilter);
-            celloFilter.connect(celloGain);
-            celloGain.connect(master);
+                tickGain.gain.setValueAtTime(0, time);
+                tickGain.gain.linearRampToValueAtTime(0.05, time + 0.005);
+                tickGain.gain.exponentialRampToValueAtTime(0.001, time + 0.05);
 
-            oscs.push(cello1, cello2);
-            gains.push(celloGain);
+                tick.connect(tickGain);
+                tickGain.connect(master);
 
-            // 2. Tremolo Strings (High tension)
-            // Sawtooth waves + LFO on gain to simulate bowing speed
-            const stringOsc = ctx.createOscillator();
-            const stringGain = ctx.createGain();
-            const tremoloLFO = ctx.createOscillator();
-            const tremoloGain = ctx.createGain(); // Depth of LFO
+                tick.start(time);
+                tick.stop(time + 0.1);
 
-            stringOsc.type = 'sawtooth';
-            stringOsc.frequency.value = 220.00; // A3
-            // Slow pitch rise over 15s to build anxiety
-            stringOsc.frequency.linearRampToValueAtTime(235.00, now + duration);
-
-            tremoloLFO.frequency.value = 8; // 8Hz bowing
-            tremoloGain.gain.value = 0.15; // Depth
-
-            // Connect LFO to Gain.gain
-            // Need a base value: gain.value = 0.1, LFO modulates +/- 0.05
-            stringGain.gain.value = 0.1;
-
-            tremoloLFO.connect(tremoloGain);
-            tremoloGain.connect(stringGain.gain);
-
-            stringOsc.connect(stringGain);
-            stringGain.connect(master);
-
-            oscs.push(stringOsc, tremoloLFO);
-            gains.push(stringGain);
-
-            // 3. Deep Pulse (Heartbeat-like throb)
-            const pulseOsc = ctx.createOscillator();
-            const pulseGain = ctx.createGain();
-
-            pulseOsc.type = 'sine';
-            pulseOsc.frequency.value = 40; // Deep sub
-
-            // Rhythmic pulsing (e.g. every 1.5s)
-            // Envelope loop
-            pulseGain.gain.setValueAtTime(0, now);
-            for (let t = 0; t < duration; t += 1.2) {
-                // Thump
-                pulseGain.gain.linearRampToValueAtTime(0.5, now + t + 0.05);
-                pulseGain.gain.exponentialRampToValueAtTime(0.01, now + t + 0.4);
+                // Slight acceleration
+                interval = Math.max(0.2, interval * 0.95);
+                time += interval;
             }
 
-            pulseOsc.connect(pulseGain);
+            // 2. The Anxiety Pad (Rising Synth)
+            const pad = ctx.createOscillator();
+            const padGain = ctx.createGain();
+
+            pad.type = 'sawtooth';
+            pad.frequency.setValueAtTime(100, now);
+            // Rise from 100Hz to 200Hz over 15s
+            pad.frequency.linearRampToValueAtTime(200, now + 15);
+
+            // Lowpass filter to make it "background"
+            const filter = ctx.createBiquadFilter();
+            filter.type = 'lowpass';
+            filter.frequency.value = 600;
+
+            padGain.gain.setValueAtTime(0, now);
+            padGain.gain.linearRampToValueAtTime(0.2, now + 2); // Fade in
+
+            pad.connect(filter);
+            filter.connect(padGain);
+            padGain.connect(master);
+
+            pad.start(now);
+            oscs.push(pad);
+
+            // 3. Digital Pulse (Heartbeat backup)
+            const pulse = ctx.createOscillator();
+            const pulseGain = ctx.createGain();
+            pulse.type = 'sine';
+            pulse.frequency.value = 60;
+
+            const lfo = ctx.createOscillator();
+            lfo.frequency.value = 1.5; // Faster pulse
+            const lfoGain = ctx.createGain();
+            lfoGain.gain.value = 0.5;
+
+            lfo.connect(lfoGain);
+            lfoGain.connect(pulseGain.gain);
+
+            pulseGain.gain.value = 0.2;
+
+            pulse.connect(pulseGain);
             pulseGain.connect(master);
-            oscs.push(pulseOsc);
-            gains.push(pulseGain);
 
-            // Start all
-            oscs.forEach(o => o.start(now));
+            pulse.start(now);
+            lfo.start(now);
+            oscs.push(pulse, lfo);
 
-            tensionNodes = { oscs, gains, master };
+            tensionNodes = { oscs, gains: [padGain, pulseGain], master };
         } catch (e) { /* ignore */ }
     },
 

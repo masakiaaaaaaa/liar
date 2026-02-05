@@ -27,4 +27,4 @@ export type WorkerMessage =
 
 export type WorkerResponse =
     | { type: 'SAMPLE_PROCESSED'; payload: SignalSample & { sqi: SQIMetrics } }
-    | { type: 'BPM_UPDATE'; payload: { bpm: number; confidence: number; rmssd: number } };
+    | { type: 'BPM_UPDATE'; payload: { bpm: number; confidence: number; rmssd: number; peakCount: number } };

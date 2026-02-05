@@ -15,6 +15,8 @@ export const useScanner = ({ videoRef, active }: UseScannerProps) => {
     const [confidence, setConfidence] = useState<number>(0);
     const [rmssd, setRmssd] = useState<number>(0);
 
+    const [peakCount, setPeakCount] = useState<number>(0);
+
     const bufferRef = useRef<number[]>([]);
 
     useEffect(() => {
@@ -29,24 +31,24 @@ export const useScanner = ({ videoRef, active }: UseScannerProps) => {
                 const { value, sqi: newSqi } = payload;
 
                 bufferRef.current.push(value);
-                if (bufferRef.current.length > 120) { // Keep last 4 seconds (30fps * 4)
+                if (bufferRef.current.length > 200) { // Keep slightly more history
                     bufferRef.current.shift();
                 }
 
                 setDataPoints([...bufferRef.current]);
                 setSqi(newSqi);
             } else if (type === 'BPM_UPDATE') {
-                // Smooth BPM using Exponential Moving Average (EMA)
-                // Alpha determines responsiveness vs smoothness (0.1 = very smooth, 0.9 = very responsive)
+                // Smooth BPM
                 const alpha = 0.2;
                 setBpm(prev => {
-                    if (prev === 0) return payload.bpm; // Jump to first value
-                    // Ignore sudden extreme jumps (e.g. > 30 bpm change) unless it persists (not implemented here for simplicity, relying on EMA)
+                    if (prev === 0) return payload.bpm;
                     return Math.round(prev * (1 - alpha) + payload.bpm * alpha);
                 });
 
                 setConfidence(payload.confidence);
                 setRmssd(payload.rmssd);
+                // @ts-ignore - peakCount exists in corrected worker
+                setPeakCount(payload.peakCount || 0);
             }
         };
 
@@ -61,6 +63,9 @@ export const useScanner = ({ videoRef, active }: UseScannerProps) => {
             worker.terminate();
         };
     }, []);
+
+    // ... (rest of the file)
+
 
     useEffect(() => {
         let animationFrameId: number;
@@ -108,5 +113,5 @@ export const useScanner = ({ videoRef, active }: UseScannerProps) => {
         };
     }, [active, videoRef]);
 
-    return { dataPoints, sqi, bpm, confidence, rmssd };
+    return { dataPoints, sqi, bpm, confidence, rmssd, peakCount };
 };

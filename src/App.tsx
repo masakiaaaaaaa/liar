@@ -51,22 +51,29 @@ function App() {
 
   const { videoRef, ready, error } = useCamera({ active: isCameraActive });
   const { init, toggle, on, fallbackMode } = useTorch();
-  const { dataPoints, sqi, bpm, rmssd } = useScanner({ videoRef, active: ready && isCameraActive });
+  const { dataPoints, sqi, bpm, rmssd, peakCount, confidence } = useScanner({ videoRef, active: ready && isCameraActive });
 
   const [scanProgress, setScanProgress] = useState(0);
   const [analysisProgress, setAnalysisProgress] = useState(0);
   const [finalResult, setFinalResult] = useState<TruthResult | null>(null);
 
-  const finalStats = useRef({ bpm: 0, rmssd: 0 });
+  const finalStats = useRef({ bpm: 0, rmssd: 0, peakCount: 0, confidence: 0 });
+
   const latestBpm = useRef(0);
   const latestRmssd = useRef(0);
+  const latestPeakCount = useRef(0);
+  const latestConfidence = useRef(0);
 
   useEffect(() => { init(); }, [init]);
+
 
   useEffect(() => {
     latestBpm.current = bpm;
     latestRmssd.current = rmssd;
-  }, [bpm, rmssd]);
+    latestPeakCount.current = peakCount;
+    latestConfidence.current = confidence;
+  }, [bpm, rmssd, peakCount, confidence]);
+
 
   useEffect(() => {
     if (gameState === 'SCANNING' && bpm > 0) {
@@ -138,7 +145,12 @@ function App() {
           if (p >= 100) {
             clearInterval(timer);
             SoundManager.stopTensionBGM(); // Fade out tension BGM
-            finalStats.current = { bpm: latestBpm.current, rmssd: latestRmssd.current };
+            finalStats.current = {
+              bpm: latestBpm.current,
+              rmssd: latestRmssd.current,
+              peakCount: latestPeakCount.current,
+              confidence: latestConfidence.current
+            };
             setGameState('ANALYZING');
           }
         }
@@ -271,6 +283,8 @@ function App() {
             result={finalResult}
             bpm={finalStats.current.bpm}
             rmssd={finalStats.current.rmssd}
+            peakCount={finalStats.current.peakCount}
+            confidence={finalStats.current.confidence}
             onRestart={handleRestart}
           />
         </div>
