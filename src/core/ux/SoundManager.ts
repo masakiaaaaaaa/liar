@@ -105,74 +105,103 @@ export const SoundManager = {
     },
 
     /**
-     * Start tension-building BGM (Accelerating Radar/Sonar Ping)
-     * Classic "Time running out" / "Submarine" tension
+     * Start tension-building BGM (Rich Orchestral Tension)
+     * "Hans Zimmer" style: Cello drone, Tremolo Strings, Deep Pulse
      */
     startTensionBGM: () => {
         try {
             const ctx = getAudioContext();
             const master = ctx.createGain();
-            // Start volume lower
-            master.gain.setValueAtTime(0.3, ctx.currentTime);
+            // Start quiet and fade in slowly
+            master.gain.setValueAtTime(0.001, ctx.currentTime);
+            master.gain.exponentialRampToValueAtTime(0.4, ctx.currentTime + 3.0);
             master.connect(ctx.destination);
 
             const oscs: OscillatorNode[] = [];
+            const gains: GainNode[] = []; // Keep track to stop
 
-            // 1. The Radar Ping (High, Piercing, Recurring)
-            // We'll use a loop of scheduled beeps rather than a continuous LFO primarily
-            // because we want it to sound "electronic" and precise.
+            const now = ctx.currentTime;
+            const duration = 16.0; // Play slightly longer than scan
 
-            const startTime = ctx.currentTime;
-            const duration = 15.0; // Scan duration
+            // 1. Low Cello Drone (Sawtooth + Lowpass)
+            // Provides the "guts" of the sound
+            const cello1 = ctx.createOscillator();
+            const cello2 = ctx.createOscillator();
+            const celloGain = ctx.createGain();
+            const celloFilter = ctx.createBiquadFilter();
 
-            // The precise scheduling logic
-            let time = startTime;
-            let interval = 1.2; // Start slow
+            cello1.type = 'sawtooth';
+            cello1.frequency.value = 55.00; // A1
+            cello2.type = 'sawtooth';
+            cello2.frequency.value = 55.35; // Slight detune for "width"
 
-            // Schedule pings for the duration of the scan + a bit more
-            while (time < startTime + duration + 1) {
-                const osc = ctx.createOscillator();
-                const gain = ctx.createGain();
+            celloFilter.type = 'lowpass';
+            celloFilter.frequency.value = 250;
+            celloFilter.Q.value = 1;
 
-                osc.type = 'sine';
-                osc.frequency.value = 1200; // High sonar ping
+            celloGain.gain.value = 0.3;
 
-                // Envelope: Sharp attack, long decay
-                gain.gain.setValueAtTime(0, time);
-                gain.gain.linearRampToValueAtTime(0.15, time + 0.01);
-                gain.gain.exponentialRampToValueAtTime(0.001, time + 0.4);
+            cello1.connect(celloFilter);
+            cello2.connect(celloFilter);
+            celloFilter.connect(celloGain);
+            celloGain.connect(master);
 
-                osc.connect(gain);
-                gain.connect(master);
+            oscs.push(cello1, cello2);
+            gains.push(celloGain);
 
-                osc.start(time);
-                osc.stop(time + 0.5);
+            // 2. Tremolo Strings (High tension)
+            // Sawtooth waves + LFO on gain to simulate bowing speed
+            const stringOsc = ctx.createOscillator();
+            const stringGain = ctx.createGain();
+            const tremoloLFO = ctx.createOscillator();
+            const tremoloGain = ctx.createGain(); // Depth of LFO
 
-                // Accelerate: Reduce interval
-                interval = Math.max(0.2, interval * 0.9); // 10% faster each ping
-                time += interval;
+            stringOsc.type = 'sawtooth';
+            stringOsc.frequency.value = 220.00; // A3
+            // Slow pitch rise over 15s to build anxiety
+            stringOsc.frequency.linearRampToValueAtTime(235.00, now + duration);
+
+            tremoloLFO.frequency.value = 8; // 8Hz bowing
+            tremoloGain.gain.value = 0.15; // Depth
+
+            // Connect LFO to Gain.gain
+            // Need a base value: gain.value = 0.1, LFO modulates +/- 0.05
+            stringGain.gain.value = 0.1;
+
+            tremoloLFO.connect(tremoloGain);
+            tremoloGain.connect(stringGain.gain);
+
+            stringOsc.connect(stringGain);
+            stringGain.connect(master);
+
+            oscs.push(stringOsc, tremoloLFO);
+            gains.push(stringGain);
+
+            // 3. Deep Pulse (Heartbeat-like throb)
+            const pulseOsc = ctx.createOscillator();
+            const pulseGain = ctx.createGain();
+
+            pulseOsc.type = 'sine';
+            pulseOsc.frequency.value = 40; // Deep sub
+
+            // Rhythmic pulsing (e.g. every 1.5s)
+            // Envelope loop
+            pulseGain.gain.setValueAtTime(0, now);
+            for (let t = 0; t < duration; t += 1.2) {
+                // Thump
+                pulseGain.gain.linearRampToValueAtTime(0.5, now + t + 0.05);
+                pulseGain.gain.exponentialRampToValueAtTime(0.01, now + t + 0.4);
             }
 
-            // 2. Underlying Deep Rumble (Continuous)
-            const bass = ctx.createOscillator();
-            const bassGain = ctx.createGain();
-            bass.type = 'sawtooth';
-            bass.frequency.value = 50;
-            // Filter to make it "underwater"
-            const filter = ctx.createBiquadFilter();
-            filter.type = 'lowpass';
-            filter.frequency.value = 200;
+            pulseOsc.connect(pulseGain);
+            pulseGain.connect(master);
+            oscs.push(pulseOsc);
+            gains.push(pulseGain);
 
-            bassGain.gain.setValueAtTime(0.1, startTime);
-            bassGain.gain.linearRampToValueAtTime(0.4, startTime + duration); // Rumble gets louder
+            // Start all
+            oscs.forEach(o => o.start(now));
 
-            bass.connect(filter);
-            filter.connect(bassGain);
-            bassGain.connect(master);
-            bass.start(startTime);
-            oscs.push(bass);
-
-            tensionNodes = { oscs, gains: [bassGain], master };
+            tensionNodes = { oscs, gains, master };
         } catch (e) { /* ignore */ }
     },
 
