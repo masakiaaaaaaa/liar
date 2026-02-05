@@ -39,12 +39,18 @@ Key Values: "Party Mode" (Entertainment) and "Training Mode" (Self-care/Basellin
     - `/pages`: Home, Measure, Result, History
     - `/styles`: global.css, variables.css
 
-### Phase 1: PoC & Core Signal Pipeline
-#### [NEW] `src/core/signal/`
-- **Signal Processing**:
-  - **Resampling**: Linear/Cubic Interpolation to normalize variable framerates to fixed 30Hz (Crucial for Webcams).
-  - **Bandpass filter**: 4th-order Butterworth IIR (0.7-4.0Hz).
-  - **Ensemble BPM**: FFT + Autocorrelation.
+### Phase 1: PoC & Core## Signal Processing 2.0 (High Precision)
+- [x] **Resampling**: Linear Interpolation to strict 30Hz (Fixes webcam jitter)
+- [x] **Filtering**: 4th Order IIR Bandpass (0.7 - 4.0 Hz)
+- [ ] **Peak Detection**: Time-domain peak detection on filtered signal
+    - Use `PeakDetector` class currently unused
+    - Extract Peak-to-Peak Intervals (PPI)
+- [ ] **True HRV Metrics**:
+    - Calculate real RMSSD from PPIs (Root Mean Square of Successive Differences)
+    - Replace placeholder "Confidence-based" RMSSD
+- [ ] **Ensemble BPM 2.0**:
+    - Fuse FFT, Autocorrelation, AND Time-Domain (PPI) BPM
+    - Prioritize Time-Domain when PPI variance is low (stable signal)
 - **SQI (Signal Quality Index)**: Implement logic to judge if the finger is placed correctly.
     - Brightness (Red channel active?)
     - Stability (Motion artifacts?)

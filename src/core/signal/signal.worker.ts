@@ -10,6 +10,7 @@
  * 6. Linear Interpolation Resampling for reliable 30Hz analysis
  */
 
+import { PeakDetector } from './peak-detection';
 import type { WorkerMessage, WorkerResponse } from './types';
 
 // ============== CONFIGURATION ==============
@@ -47,6 +48,10 @@ const filterState = {
     lp_x: [0, 0, 0],
     lp_y: [0, 0, 0]
 };
+
+// Peak Detector Instance
+const peakDetector = new PeakDetector();
+const ppiBuffer: number[] = []; // Buffer for Peak-to-Peak Intervals (ms)
 
 // Resampler State
 const resampler = {
@@ -107,6 +112,8 @@ const resampler = {
     }
 };
 
+const peaks: { t: number, v: number }[] = [];
+
 // ============== MAIN MESSAGE HANDLER ==============
 self.onmessage = (event: MessageEvent<WorkerMessage>) => {
     const message = event.data;
@@ -151,63 +158,120 @@ self.onmessage = (event: MessageEvent<WorkerMessage>) => {
                 signalBuffer.shift();
                 timestampBuffer.shift();
             }
+
+            // 7. Peak Detection (Time Domain)
+            const peak = peakDetector.detect(filtered, virtualTimestamp);
+            if (peak) {
+                peaks.push({ t: peak.timestamp, v: peak.value });
+                if (peaks.length > 20) peaks.shift(); // Keep last 20 peaks
+            }
         }
 
-        // Only run analysis if we actually processed new interpolated samples
-        // AND we have enough data buffer
+        // ANALYSIS
         let bpm = 0;
         let confidence = 0;
         let rmssd = 0;
 
+        // Only analyze if we have enough signal
         if (processedAny && signalBuffer.length >= CONFIG.FPS * 3) {
+
+            // 1. Time-Domain Metrics (PPI)
+            let timeDomainBPM = 0;
+            let timeDomainConf = 0;
+
+            if (peaks.length >= 3) {
+                // Calculate PPIs
+                const ppis: number[] = [];
+                for (let i = 1; i < peaks.length; i++) {
+                    ppis.push(peaks[i].t - peaks[i - 1].t);
+                }
+                const currentPPIs = ppis.filter(p => p > 300 && p < 1500); // Filter insane values (40-200 BPM)
+
+                if (currentPPIs.length >= 2) {
+                    // Median PPI
+                    currentPPIs.sort((a, b) => a - b);
+                    const medianPPI = currentPPIs[Math.floor(currentPPIs.length / 2)];
+                    timeDomainBPM = 60000 / medianPPI;
+
+                    // Variance/Stability check
+                    const ppiMean = currentPPIs.reduce((a, b) => a + b, 0) / currentPPIs.length;
+                    const ppiVar = currentPPIs.reduce((a, b) => a + Math.pow(b - ppiMean, 2), 0) / currentPPIs.length;
+                    const ppiStd = Math.sqrt(ppiVar);
+
+                    // Confidence based on regularity (lower std dev = higher confidence)
+                    // Normal HRV std is ~20-100ms. If < 50ms, very stable.
+                    timeDomainConf = Math.max(0, 100 - (ppiStd * 2));
+
+                    // Calculate Real RMSSD
+                    // sqrt(mean(diff(PPI)^2))
+                    let sumDiffSq = 0;
+                    let count = 0;
+
+                    for (let i = 1; i < currentPPIs.length; i++) {
+                        const diff = currentPPIs[i] - currentPPIs[i - 1];
+                        sumDiffSq += diff * diff;
+                        count++;
+                    }
+
+                    if (count > 0) {
+                        rmssd = Math.sqrt(sumDiffSq / count);
+                    }
+                }
+            }
+
+            // 2. Frequency Domain
             const fftResult = estimateBPM_FFT(signalBuffer);
             const acResult = estimateBPM_Autocorrelation(signalBuffer);
 
-            // Ensemble: prefer FFT if confident, otherwise use AC
-            if (fftResult.confidence > 30) {
-                bpm = fftResult.bpm;
-                confidence = fftResult.confidence;
+            // 3. Ensemble Fusion
+            // If Time-Domain is highly confident (stable intervals), it is usually most accurate.
+            if (timeDomainConf > 80) {
+                bpm = timeDomainBPM;
+                confidence = timeDomainConf;
+            } else {
+                // Determine agreement
+                const methods = [
+                    { src: 'FFT', bpm: fftResult.bpm, conf: fftResult.confidence },
+                    { src: 'AC', bpm: acResult.bpm, conf: acResult.confidence },
+                    { src: 'TD', bpm: timeDomainBPM, conf: timeDomainConf }
+                ].filter(m => m.conf > 10 && m.bpm > 0);
 
-                // Cross-validate with autocorrelation
-                if (Math.abs(fftResult.bpm - acResult.bpm) < 10) {
-                    confidence = Math.min(100, confidence * 1.3); // Boost if methods agree
+                if (methods.length > 0) {
+                    // Pick method with highest confidence
+                    methods.sort((a, b) => b.conf - a.conf);
+                    bpm = methods[0].bpm;
+                    confidence = methods[0].conf;
+
+                    // Boost if others agree
+                    const agreed = methods.filter(m => Math.abs(m.bpm - bpm) < 10).length;
+                    if (agreed > 1) confidence = Math.min(100, confidence + 20);
                 }
-            } else if (acResult.confidence > 20) {
-                bpm = acResult.bpm;
-                confidence = acResult.confidence;
             }
         }
 
-        // 7. Calculate SNR for signal quality feedback
+        // 8. Calculate SNR for signal quality feedback
         const snr = calculateSNR(signalBuffer);
 
-        // 8. Send BPM update if valid
+        // 9. Send BPM update if valid
         if (bpm >= CONFIG.MIN_BPM && bpm <= CONFIG.MAX_BPM && confidence > 15) {
-            // Calculate approximate RMSSD from confidence
-            rmssd = Math.max(20, 80 - confidence + Math.random() * 20);
-
             const responseBpm: WorkerResponse = {
                 type: 'BPM_UPDATE',
                 payload: {
                     bpm: Math.round(bpm),
                     confidence: Math.round(confidence),
-                    rmssd
+                    rmssd // Now strictly real
                 }
             };
             self.postMessage(responseBpm);
         }
 
-        // 9. Send processed sample for visualization
-        // Prefer sending the latest processed sample to reduce jitter
-        // If we didn't produce a new sample (interpolation wait), we skip sending a visualization frame 
-        // to avoid drawing duplicate or jerky points, unless we want to visualize the raw frame rate.
-        // Let's send only when we have a new filtered point.
+        // 10. Send processed sample for visualization
         if (processedAny) {
             const response: WorkerResponse = {
                 type: 'SAMPLE_PROCESSED',
                 payload: {
                     timestamp,
-                    value: lastFilteredValue * 50, // Scale for visualization
+                    value: lastFilteredValue * 50,
                     r: extraction.avgR,
                     g: extraction.avgG,
                     b: extraction.avgB,
@@ -226,6 +290,8 @@ self.onmessage = (event: MessageEvent<WorkerMessage>) => {
         signalBuffer.length = 0;
         rawBuffer.length = 0;
         timestampBuffer.length = 0;
+        peaks.length = 0;
+        ppiBuffer.length = 0;
 
         // Reset Resampler
         resampler.inputBuffer = [];
@@ -236,6 +302,9 @@ self.onmessage = (event: MessageEvent<WorkerMessage>) => {
         filterState.hp_y = [0, 0, 0];
         filterState.lp_x = [0, 0, 0];
         filterState.lp_y = [0, 0, 0];
+
+        // Reset Peak Detector
+        peakDetector.reset();
     }
 };
 
