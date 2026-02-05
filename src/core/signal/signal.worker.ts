@@ -180,42 +180,40 @@ self.onmessage = (event: MessageEvent<WorkerMessage>) => {
             let timeDomainConf = 0;
 
             if (peaks.length >= 3) {
-                // Calculate PPIs
+                // Calculate PPIs (original temporal order)
                 const ppis: number[] = [];
                 for (let i = 1; i < peaks.length; i++) {
                     ppis.push(peaks[i].t - peaks[i - 1].t);
                 }
-                const currentPPIs = ppis.filter(p => p > 300 && p < 1500); // Filter insane values (40-200 BPM)
+                // Filter insane values but preserve order
+                const validPPIs = ppis.filter(p => p > 300 && p < 1500);
 
-                if (currentPPIs.length >= 2) {
-                    // Median PPI
-                    currentPPIs.sort((a, b) => a - b);
-                    const medianPPI = currentPPIs[Math.floor(currentPPIs.length / 2)];
-                    timeDomainBPM = 60000 / medianPPI;
-
-                    // Variance/Stability check
-                    const ppiMean = currentPPIs.reduce((a, b) => a + b, 0) / currentPPIs.length;
-                    const ppiVar = currentPPIs.reduce((a, b) => a + Math.pow(b - ppiMean, 2), 0) / currentPPIs.length;
-                    const ppiStd = Math.sqrt(ppiVar);
-
-                    // Confidence based on regularity (lower std dev = higher confidence)
-                    // Normal HRV std is ~20-100ms. If < 50ms, very stable.
-                    timeDomainConf = Math.max(0, 100 - (ppiStd * 2));
-
-                    // Calculate Real RMSSD
-                    // sqrt(mean(diff(PPI)^2))
+                if (validPPIs.length >= 2) {
+                    // *** RMSSD MUST be calculated BEFORE sorting ***
+                    // RMSSD = sqrt(mean of (PPI[i+1] - PPI[i])^2) - successive differences
                     let sumDiffSq = 0;
                     let count = 0;
-
-                    for (let i = 1; i < currentPPIs.length; i++) {
-                        const diff = currentPPIs[i] - currentPPIs[i - 1];
+                    for (let i = 1; i < validPPIs.length; i++) {
+                        const diff = validPPIs[i] - validPPIs[i - 1];
                         sumDiffSq += diff * diff;
                         count++;
                     }
-
                     if (count > 0) {
                         rmssd = Math.sqrt(sumDiffSq / count);
                     }
+
+                    // NOW sort for median BPM calculation
+                    const sortedPPIs = [...validPPIs].sort((a, b) => a - b);
+                    const medianPPI = sortedPPIs[Math.floor(sortedPPIs.length / 2)];
+                    timeDomainBPM = 60000 / medianPPI;
+
+                    // Variance/Stability check (can use sorted or unsorted, doesn't matter for variance)
+                    const ppiMean = validPPIs.reduce((a, b) => a + b, 0) / validPPIs.length;
+                    const ppiVar = validPPIs.reduce((a, b) => a + Math.pow(b - ppiMean, 2), 0) / validPPIs.length;
+                    const ppiStd = Math.sqrt(ppiVar);
+
+                    // Confidence based on regularity (lower std dev = higher confidence)
+                    timeDomainConf = Math.max(0, 100 - (ppiStd * 2));
                 }
             }
 
