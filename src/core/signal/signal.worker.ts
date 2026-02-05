@@ -128,7 +128,8 @@ function processFrame(imageData: ImageData, timestamp: number): SignalSample & {
         sqi: {
             brightness: (avgR + avgG + avgB) / 3,
             saturation: saturated / count,
-            snr: 0 // Calc downstream
+            snr: 0, // Calc downstream
+            redRatio: avgR / ((avgG + avgB) / 2 + 1) // Red dominance ratio for finger detection
         }
     };
 }

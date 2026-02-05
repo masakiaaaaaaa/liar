@@ -76,13 +76,24 @@ function App() {
   }, [bpm, gameState]);
 
   /* New Ref for SQI to access in interval */
-  const latestSqi = useRef({ brightness: 0, saturation: 0, snr: 0 });
+  const latestSqi = useRef({ brightness: 0, saturation: 0, snr: 0, redRatio: 0 });
   const [isFingerDetected, setIsFingerDetected] = useState(false);
 
   useEffect(() => {
-    latestSqi.current = sqi;
-    // Simple brightness check for finger detection UI
-    setIsFingerDetected(sqi.brightness > 30);
+    // Update ref with new SQI, handling optional redRatio
+    latestSqi.current = {
+      brightness: sqi.brightness,
+      saturation: sqi.saturation,
+      snr: sqi.snr,
+      redRatio: sqi.redRatio ?? 0
+    };
+    // Finger detection: when finger covers camera, brightness goes UP (from flash/screen light)
+    // AND red channel becomes dominant (blood under skin absorbs non-red light)
+    const brightness = sqi.brightness;
+    const redRatio = sqi.redRatio || 0;
+    // Finger present if: brightness is moderate-high AND red is dominant (> 1.3 ratio)
+    const fingerPresent = brightness > 80 && brightness < 250 && redRatio > 1.3;
+    setIsFingerDetected(fingerPresent);
   }, [sqi]);
 
   useEffect(() => {
@@ -99,19 +110,16 @@ function App() {
       const startTime = Date.now(); // Keep track for timeout
 
       const timer = setInterval(() => {
-        // Quality Check
-        const { brightness, snr } = latestSqi.current;
-        const hasFinger = brightness > 30 && brightness < 240; // Avoid fully white/black
-        const hasSignal = snr > 0.5; // Basic signal check
+        // Quality Check using redRatio
+        const { brightness, redRatio } = latestSqi.current;
+        // Finger present: brightness OK (80-250) AND red dominant (ratio > 1.3)
+        const hasFinger = brightness > 80 && brightness < 250 && (redRatio || 0) > 1.3;
 
         if (hasFinger) {
           // Advance progress only when finger is present
           elapsedValidTime += 100;
 
-          // Boost progress if signal is good to make it feel responsive
-          const speedMultiplier = hasSignal ? 1.0 : 0.5;
-
-          const p = Math.min((elapsedValidTime / duration) * 100 * speedMultiplier, 100);
+          const p = Math.min((elapsedValidTime / duration) * 100, 100);
           setScanProgress(p);
 
           if (p >= 100) {
@@ -119,13 +127,11 @@ function App() {
             finalStats.current = { bpm: latestBpm.current, rmssd: latestRmssd.current };
             setGameState('ANALYZING');
           }
-        } else {
-          // Finger removed? Maybe decay progress slightly or just pause?
-          // For now, pause.
         }
+        // If no finger, progress pauses (no decay for now)
 
-        // Timeout safety (30s)
-        if (Date.now() - startTime > 30000) {
+        // Timeout safety (60s)
+        if (Date.now() - startTime > 60000) {
           clearInterval(timer);
           setGameState('IDLE'); // Cancel if taking too long
         }
@@ -367,7 +373,7 @@ function App() {
                 {i18n.language === 'ja' ? currentQuestion.text.ja : currentQuestion.text.en}
               </h3>
               <p style={{ color: 'var(--color-text-secondary)', marginBottom: 'var(--space-xl)', fontSize: '14px' }}>
-                {t('game.question_instruction')}
+                {t('game_flow.question_instruction')}
               </p>
               <div style={{ display: 'flex', gap: 'var(--space-md)' }}>
                 <button
@@ -379,7 +385,7 @@ function App() {
                   className="btn btn-secondary"
                   style={{ flex: 1 }}
                 >
-                  {t('common.skip')}
+                  {t('game_flow.skip')}
                 </button>
                 <button
                   onClick={() => {
@@ -390,7 +396,7 @@ function App() {
                   className="btn btn-primary"
                   style={{ flex: 1 }}
                 >
-                  {t('common.ready')}
+                  {t('game_flow.ready')}
                 </button>
               </div>
             </div>
@@ -608,7 +614,7 @@ function App() {
               }}
             >
               <span style={{ fontSize: '24px' }} role="img" aria-hidden="true">🃏</span>
-              {t('common.draw_card')}
+              {t('game_flow.draw_card')}
             </button>
           )}
 

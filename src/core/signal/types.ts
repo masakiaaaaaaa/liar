@@ -17,6 +17,7 @@ export interface SQIMetrics {
     saturation: number; // % of pixels saturated
     brightness: number; // Average brightness
     snr: number; // Signal to Noise Ratio
+    redRatio?: number; // Red channel dominance ratio (finger detection)
 }
 
 export type WorkerMessage =

@@ -29,14 +29,16 @@ const resources = {
       },
       sqi: {
         too_dark: "Too dark",
-        draw_card: "Draw Card",
-        skip: "Skip",
-        ready: "I've Answered!",
-        question_instruction: "Answer this question truthfully... or lie?",
         too_bright: "Too bright",
         adjust_finger: "Adjust finger",
         good_signal: "Good!",
         signal_label: "Signal"
+      },
+      game_flow: {
+        draw_card: "Draw Question",
+        skip: "Next Question",
+        ready: "I Answered!",
+        question_instruction: "Answer this question out loud, then place your finger on the camera."
       },
       camera: {
         screen_torch_active: "📱 Screen Light Active",
@@ -94,6 +96,12 @@ const resources = {
         adjust_finger: "指を調整して",
         good_signal: "良好！",
         signal_label: "信号"
+      },
+      game_flow: {
+        draw_card: "質問カードを引く",
+        skip: "次の質問",
+        ready: "回答した！",
+        question_instruction: "声に出して答えてから、カメラに指を置いてください。"
       },
       camera: {
         screen_torch_active: "📱 画面ライト有効",

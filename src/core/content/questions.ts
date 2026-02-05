@@ -10,77 +10,62 @@ export type Question = {
 export const QUESTIONS: Question[] = [
     {
         id: 'q1',
-        text: { en: "Have you ever stalked an ex on social media?", ja: "元恋人のSNSをこっそり見たことがありますか？" },
+        text: { en: "Do you have a crush on someone here?", ja: "この中に気になる人がいる？" },
         category: 'romance'
     },
     {
         id: 'q2',
-        text: { en: "Do you think you are the most attractive person here?", ja: "この中で自分が一番魅力的だと思いますか？" },
-        category: 'hard'
-    },
-    {
-        id: 'q3',
-        text: { en: "Have you ever farted and blamed someone else?", ja: "おならをして他人のせいにしたことがありますか？" },
-        category: 'funny'
-    },
-    {
-        id: 'q4',
-        text: { en: "Have you ever lied to get out of a date?", ja: "デートを断るために嘘をついたことがありますか？" },
-        category: 'romance'
-    },
-    {
-        id: 'q5',
-        text: { en: "Do you have a favorite sibling/family member?", ja: "家族の中で秘密のお気に入りはいますか？" },
+        text: { en: "Have you ever lied to get out of plans?", ja: "予定をキャンセルするために嘘をついたことがある？" },
         category: 'secret'
     },
     {
+        id: 'q3',
+        text: { en: "Do you think you're the best-looking person here?", ja: "自分がこの中で一番イケてると思う？" },
+        category: 'hard'
+    },
+    {
+        id: 'q4',
+        text: { en: "Have you ever pretended to like a gift?", ja: "いらないプレゼントを嬉しいフリしたことがある？" },
+        category: 'secret'
+    },
+    {
+        id: 'q5',
+        text: { en: "Have you ever had a secret crush on a friend's partner?", ja: "友達の恋人を好きになったことがある？" },
+        category: 'romance'
+    },
+    {
         id: 'q6',
-        text: { en: "Have you ever dropped your phone in the toilet?", ja: "トイレにスマホを落としたことがありますか？" },
+        text: { en: "Do you snore?", ja: "寝てる時にいびきをかく？" },
         category: 'funny'
     },
     {
         id: 'q7',
-        text: { en: "Would you value money over love?", ja: "愛よりもお金が大事だと思いますか？" },
-        category: 'hard'
-    },
-    {
-        id: 'q8',
-        text: { en: "Have you ever gifted someone something you received?", ja: "もらったプレゼントを他の誰かにあげたことは？" },
+        text: { en: "Have you ever peeked at someone's phone?", ja: "他人のスマホをこっそり見たことがある？" },
         category: 'secret'
     },
     {
+        id: 'q8',
+        text: { en: "Would you date your best friend's ex?", ja: "親友の元カレ/元カノと付き合える？" },
+        category: 'hard'
+    },
+    {
         id: 'q9',
-        text: { en: "Do you check yourself in the mirror too much?", ja: "鏡を見る回数が多すぎると思いますか？" },
+        text: { en: "Have you ever cried watching a movie?", ja: "映画を見て泣いたことがある？" },
         category: 'funny'
     },
     {
         id: 'q10',
-        text: { en: "Have you ever kissed someone and regretted it?", ja: "キスをして後悔したことがありますか？" },
-        category: 'romance'
-    },
-    {
-        id: 'q11',
-        text: { en: "Do you have a crush on someone in this room?", ja: "この部屋の中に好きな人がいますか？" },
-        category: 'romance'
-    },
-    {
-        id: 'q12',
-        text: { en: "Have you ever laughed at a funeral?", ja: "葬式やお通夜で笑ってしまったことは？" },
-        category: 'hard'
-    },
-    {
-        id: 'q13',
-        text: { en: "Do you pick your nose when no one is looking?", ja: "誰も見ていない時に鼻をほじりますか？" },
+        text: { en: "Do you talk to yourself?", ja: "一人でいる時、独り言を言う？" },
         category: 'funny'
     },
     {
-        id: 'q14',
-        text: { en: "Have you ever pretended to like a gift?", ja: "いらないプレゼントを喜んだフリをしたことは？" },
-        category: 'secret'
+        id: 'q11',
+        text: { en: "Have you ever eaten food that fell on the floor?", ja: "落とした食べ物を拾って食べたことがある？" },
+        category: 'funny'
     },
     {
-        id: 'q15',
-        text: { en: "Would you date your best friend's ex?", ja: "親友の元恋人と付き合えますか？" },
-        category: 'hard'
+        id: 'q12',
+        text: { en: "Have you ever ghosted someone?", ja: "連絡を無視して自然消滅させたことがある？" },
+        category: 'romance'
     }
 ];
