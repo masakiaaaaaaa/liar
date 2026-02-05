@@ -10,7 +10,7 @@ export interface Peak {
 
 export class PeakDetector {
     private lastPeakTime = 0;
-    private readonly MIN_INTERVAL_MS = 300; // 200 BPM max
+    private readonly MIN_INTERVAL_MS = 450; // ~133 BPM max (User req: 50-120 range focus)
     private readonly MAX_INTERVAL_MS = 1500; // 40 BPM min
 
     // State machine for peak detection
@@ -25,8 +25,8 @@ export class PeakDetector {
     detect(value: number, timestamp: number): Peak | null {
         this.sampleCount++;
 
-        // Skip first 30 samples (~1s) to allow signal to stabilize
-        if (this.sampleCount < 30) {
+        // Skip first 75 samples (~2.5s) to allow signal to stabilize (User req)
+        if (this.sampleCount < 75) {
             this.prevPrevValue = this.prevValue;
             this.prevValue = value;
             return null;

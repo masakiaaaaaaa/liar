@@ -39,15 +39,23 @@ const WaveformDisplay: React.FC<{ data: number[]; isLie: boolean }> = ({ data, i
         }
         ctx.stroke();
 
-        // Detect and mark peaks (simple local maximum detection)
+        // Detect and mark peaks (local maximum + minimum distance)
         const peaks: number[] = [];
+        let lastPeakIdx = -100;
+        const MIN_DIST = 15; // Min distance between visual peaks
+
         for (let i = 2; i < normalized.length - 2; i++) {
             if (normalized[i] > normalized[i - 1] &&
                 normalized[i] > normalized[i - 2] &&
                 normalized[i] > normalized[i + 1] &&
                 normalized[i] > normalized[i + 2] &&
                 normalized[i] > 0.5) { // Only significant peaks
-                peaks.push(i);
+
+                // Refractory period check
+                if (i - lastPeakIdx > MIN_DIST) {
+                    peaks.push(i);
+                    lastPeakIdx = i;
+                }
             }
         }
 
