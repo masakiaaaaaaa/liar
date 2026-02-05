@@ -27,8 +27,20 @@ export class PeakDetector {
     // Running statistics
     private peakHistory: number[] = [];
     private readonly HISTORY_SIZE = 5;
+    private sampleCount = 0; // Tracks samples for warm-up
 
     detect(value: number, timestamp: number): Peak | null {
+        this.sampleCount++;
+
+        // Skip first 60 samples (~2s) to allow min/max to stabilize
+        if (this.sampleCount < 60) {
+            this.prevPrevValue = this.prevValue;
+            this.prevValue = value;
+            if (value > this.signalMax) this.signalMax = value;
+            if (value < this.signalMin) this.signalMin = value;
+            return null;
+        }
+
         // Update running min/max for adaptive threshold
         if (value > this.signalMax) this.signalMax = value;
         if (value < this.signalMin) this.signalMin = value;
@@ -38,9 +50,9 @@ export class PeakDetector {
         this.signalMax -= range * 0.001;
         this.signalMin += range * 0.001;
 
-        // Adaptive threshold at 40% of recent range
+        // Adaptive threshold: Just above midpoint (was too high before)
         const midpoint = (this.signalMax + this.signalMin) / 2;
-        this.adaptiveThreshold = midpoint + range * 0.15;
+        this.adaptiveThreshold = midpoint + range * 0.05;
 
         // Calculate slope (derivative)
         const slope = value - this.prevValue;
@@ -94,8 +106,8 @@ export class PeakDetector {
                 break;
 
             case 'FALLING':
-                // Confirm peak when signal drops significantly
-                if (value < this.localMax * 0.7 || value < this.adaptiveThreshold) {
+                // Confirm peak when signal drops significantly (RELAXED from 0.7 to 0.85)
+                if (value < this.localMax * 0.85 || value < this.adaptiveThreshold) {
                     // Check minimum interval
                     const interval = this.localMaxTime - this.lastPeakTime;
                     if (interval > this.MIN_INTERVAL_MS) {
@@ -136,5 +148,6 @@ export class PeakDetector {
         this.prevValue = 0;
         this.prevPrevValue = 0;
         this.peakHistory = [];
+        this.sampleCount = 0;
     }
 }

@@ -105,117 +105,60 @@ export const SoundManager = {
     },
 
     /**
-     * Start tension-building BGM (Shepard Tone Riser)
-     * "Impressionable" = The sound of infinite rising anxiety.
+     * Start tension-building BGM (Heartbeat Style)
+     * Simple, clear "Dokun-Dokun" (ドキドキ) heartbeat sound with accelerating tempo.
      */
     startTensionBGM: () => {
         try {
             const ctx = getAudioContext();
             const master = ctx.createGain();
-            master.gain.setValueAtTime(0.01, ctx.currentTime);
-            master.gain.linearRampToValueAtTime(0.5, ctx.currentTime + 2.0);
+            master.gain.setValueAtTime(0.4, ctx.currentTime);
             master.connect(ctx.destination);
 
             const oscs: OscillatorNode[] = [];
 
             const now = ctx.currentTime;
+            const duration = 20.0; // 20 seconds BGM
 
-            // 1. Shepard Tone Generator (Infinite Riser)
-            // We create 2 parallel sawtooth waves rising over 20s
-            // To create the illusion, as one gets high, it fades out, and a low one fades in.
+            // --- HEARTBEAT PATTERN ---
+            // A heartbeat is "Lub-Dub" (two thumps close together)
+            // Tempo starts slow (~60 BPM) and accelerates to ~120 BPM
 
-            const duration = 20.0;
+            let beatTime = now;
+            let beatInterval = 1.0; // Start at 60 BPM (1 beat per second)
 
-            const createRiser = (startFreq: number, endFreq: number) => {
-                const osc = ctx.createOscillator();
-                const gain = ctx.createGain();
+            while (beatTime < now + duration) {
+                // --- "Lub" (First thump) ---
+                const lub = ctx.createOscillator();
+                const lubGain = ctx.createGain();
+                lub.type = 'sine';
+                lub.frequency.setValueAtTime(60, beatTime);
+                lub.frequency.exponentialRampToValueAtTime(30, beatTime + 0.15);
+                lubGain.gain.setValueAtTime(0.7, beatTime);
+                lubGain.gain.exponentialRampToValueAtTime(0.001, beatTime + 0.2);
+                lub.connect(lubGain);
+                lubGain.connect(master);
+                lub.start(beatTime);
+                lub.stop(beatTime + 0.25);
 
-                osc.type = 'sawtooth';
-                osc.frequency.setValueAtTime(startFreq, now);
-                osc.frequency.exponentialRampToValueAtTime(endFreq, now + duration);
+                // --- "Dub" (Second thump, slightly higher, after short pause) ---
+                const dubTime = beatTime + 0.15; // 150ms after first thump
+                const dub = ctx.createOscillator();
+                const dubGain = ctx.createGain();
+                dub.type = 'sine';
+                dub.frequency.setValueAtTime(50, dubTime);
+                dub.frequency.exponentialRampToValueAtTime(25, dubTime + 0.1);
+                dubGain.gain.setValueAtTime(0.5, dubTime);
+                dubGain.gain.exponentialRampToValueAtTime(0.001, dubTime + 0.15);
+                dub.connect(dubGain);
+                dubGain.connect(master);
+                dub.start(dubTime);
+                dub.stop(dubTime + 0.2);
 
-                // Gain bell curve to hide start/stop
-                // Fade in, hold, fade out
-                gain.gain.setValueAtTime(0, now);
-                gain.gain.linearRampToValueAtTime(0.15, now + 1); // Fade in
-                gain.gain.setValueAtTime(0.15, now + duration - 2);
-                gain.gain.linearRampToValueAtTime(0, now + duration); // Fade out
-
-                // Filter to make it dark
-                const filter = ctx.createBiquadFilter();
-                filter.type = 'lowpass';
-                filter.frequency.value = 400;
-                filter.Q.value = 1;
-
-                osc.connect(filter);
-                filter.connect(gain);
-                gain.connect(master);
-
-                osc.start(now);
-                osc.stop(now + duration);
-
-                oscs.push(osc);
-            };
-
-            // Layer the risers
-            createRiser(55, 220); // Low to Mid
-            createRiser(110, 440); // Mid to High
-
-            // 2. Cinematic Thud (Heartbeat / Impact)
-            // Deep, distorted kick every 1.2s -> 0.8s (Accelerating)
-
-            let impactTime = now;
-            let impactInterval = 1.3;
-
-            while (impactTime < now + duration) {
-                const kick = ctx.createOscillator();
-                const kickGain = ctx.createGain();
-
-                kick.frequency.setValueAtTime(100, impactTime);
-                kick.frequency.exponentialRampToValueAtTime(30, impactTime + 0.1);
-
-                kickGain.gain.setValueAtTime(0.6, impactTime);
-                kickGain.gain.exponentialRampToValueAtTime(0.001, impactTime + 0.3);
-
-                // Distort slightly
-                // Simple distortion curve could be added here, but raw sine drop is punchy enough for web
-                // Let's use a triangle for more grit
-                kick.type = 'triangle';
-
-                kick.connect(kickGain);
-                kickGain.connect(master);
-
-                kick.start(impactTime);
-                kick.stop(impactTime + 0.3);
-
-                impactInterval = Math.max(0.6, impactInterval * 0.95); // Accelerate
-                impactTime += impactInterval;
+                // Accelerate the tempo
+                beatInterval = Math.max(0.5, beatInterval * 0.95); // Minimum ~120 BPM
+                beatTime += beatInterval;
             }
-
-            // 3. High Anxiety Drone (The "Psycho" element)
-            // High pitch sine wave drifting
-            const drone = ctx.createOscillator();
-            const droneGain = ctx.createGain();
-
-            drone.type = 'sine';
-            drone.frequency.setValueAtTime(800, now);
-            drone.frequency.linearRampToValueAtTime(1200, now + duration);
-
-            const tremolo = ctx.createOscillator();
-            tremolo.frequency.value = 10;
-            const tremoloGain = ctx.createGain();
-            tremoloGain.gain.value = 0.05;
-            tremolo.connect(tremoloGain);
-            tremoloGain.connect(droneGain.gain);
-
-            droneGain.gain.value = 0.02; // Very subtle piercing sound
-
-            drone.connect(droneGain);
-            droneGain.connect(master);
-
-            drone.start(now);
-            tremolo.start(now);
-            oscs.push(drone, tremolo);
 
             tensionNodes = { oscs, gains: [], master };
         } catch (e) { /* ignore */ }
