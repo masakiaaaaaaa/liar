@@ -1,6 +1,86 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { TruthResult } from '../../core/analysis/truthMetric';
+
+// Waveform visualization component for result details
+const WaveformDisplay: React.FC<{ data: number[]; isLie: boolean }> = ({ data, isLie }) => {
+    const canvasRef = useRef<HTMLCanvasElement>(null);
+
+    useEffect(() => {
+        const canvas = canvasRef.current;
+        if (!canvas || data.length === 0) return;
+
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+
+        const width = canvas.width;
+        const height = canvas.height;
+
+        // Clear
+        ctx.fillStyle = '#1e293b';
+        ctx.fillRect(0, 0, width, height);
+
+        // Normalize data
+        const min = Math.min(...data);
+        const max = Math.max(...data);
+        const range = max - min || 1;
+        const normalized = data.map(v => (v - min) / range);
+
+        // Draw waveform
+        ctx.beginPath();
+        ctx.strokeStyle = isLie ? '#ef4444' : '#22c55e';
+        ctx.lineWidth = 2;
+
+        for (let i = 0; i < normalized.length; i++) {
+            const x = (i / normalized.length) * width;
+            const y = height - (normalized[i] * (height - 20)) - 10;
+            if (i === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+
+        // Detect and mark peaks (simple local maximum detection)
+        const peaks: number[] = [];
+        for (let i = 2; i < normalized.length - 2; i++) {
+            if (normalized[i] > normalized[i - 1] &&
+                normalized[i] > normalized[i - 2] &&
+                normalized[i] > normalized[i + 1] &&
+                normalized[i] > normalized[i + 2] &&
+                normalized[i] > 0.5) { // Only significant peaks
+                peaks.push(i);
+            }
+        }
+
+        // Draw peak markers
+        ctx.fillStyle = '#fbbf24';
+        peaks.forEach(idx => {
+            const x = (idx / normalized.length) * width;
+            const y = height - (normalized[idx] * (height - 20)) - 10;
+            ctx.beginPath();
+            ctx.arc(x, y, 4, 0, Math.PI * 2);
+            ctx.fill();
+        });
+
+        // Label
+        ctx.fillStyle = '#94a3b8';
+        ctx.font = '10px sans-serif';
+        ctx.fillText(`波形データ (${data.length}点, ${peaks.length}ピーク)`, 6, 12);
+    }, [data, isLie]);
+
+    return (
+        <canvas
+            ref={canvasRef}
+            width={280}
+            height={80}
+            style={{
+                width: '100%',
+                height: '60px',
+                borderRadius: '6px',
+                marginBottom: '12px'
+            }}
+        />
+    );
+};
 
 interface ResultCardProps {
     result: TruthResult;
@@ -8,10 +88,11 @@ interface ResultCardProps {
     rmssd: number;
     peakCount: number;
     confidence: number;
+    waveformData?: number[];
     onRestart: () => void;
 }
 
-export const ResultCard: React.FC<ResultCardProps> = ({ result, bpm, rmssd, peakCount, confidence, onRestart }) => {
+export const ResultCard: React.FC<ResultCardProps> = ({ result, bpm, rmssd, peakCount, confidence, waveformData = [], onRestart }) => {
     const { t, i18n } = useTranslation();
     const [showDetails, setShowDetails] = useState(false);
 
@@ -175,6 +256,11 @@ export const ResultCard: React.FC<ResultCardProps> = ({ result, bpm, rmssd, peak
                     textAlign: 'left',
                     boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.05)'
                 }}>
+                    {/* Waveform Canvas */}
+                    {waveformData.length > 0 && (
+                        <WaveformDisplay data={waveformData} isLie={isLie} />
+                    )}
+
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
                         <span>平均心拍数 (Avg BPM):</span>
                         <strong>{bpm.toFixed(0)} bpm</strong>

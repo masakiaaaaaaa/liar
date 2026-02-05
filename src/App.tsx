@@ -76,6 +76,7 @@ function App() {
   const [scanProgress, setScanProgress] = useState(0);
   const [analysisProgress, setAnalysisProgress] = useState(0);
   const [finalResult, setFinalResult] = useState<TruthResult | null>(null);
+  const [finalWaveformData, setFinalWaveformData] = useState<number[]>([]);
 
   const finalStats = useRef({ bpm: 0, rmssd: 0, peakCount: 0, confidence: 0 });
 
@@ -197,6 +198,8 @@ function App() {
 
         if (p >= 100) {
           clearInterval(analysisTimer);
+          // Store waveform data for result display
+          setFinalWaveformData([...dataPoints]);
           const res = calculateTruthScore(finalStats.current.rmssd);
           setFinalResult(res);
 
@@ -305,6 +308,7 @@ function App() {
             rmssd={finalStats.current.rmssd}
             peakCount={finalStats.current.peakCount}
             confidence={finalStats.current.confidence}
+            waveformData={finalWaveformData}
             onRestart={handleRestart}
           />
         </div>
