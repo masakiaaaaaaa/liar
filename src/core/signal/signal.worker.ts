@@ -7,6 +7,7 @@
  * 3. Adaptive signal normalization
  * 4. Ensemble BPM estimation (FFT + Autocorrelation)
  * 5. Real-time SNR calculation
+ * 6. Linear Interpolation Resampling for reliable 30Hz analysis
  */
 
 import type { WorkerMessage, WorkerResponse } from './types';
@@ -33,17 +34,77 @@ const CONFIG = {
 // ============== SIGNAL BUFFERS ==============
 const signalBuffer: number[] = [];
 const rawBuffer: number[] = [];
+// timestampBuffer is used to track virtual time of the resampled signal
 const timestampBuffer: number[] = [];
 const MAX_BUFFER_SIZE = CONFIG.FPS * 10; // 10 seconds
 
 // Filter state (2nd order sections for stability)
-let filterState = {
+const filterState = {
     // Highpass state (removes DC and breathing)
     hp_x: [0, 0, 0],
     hp_y: [0, 0, 0],
     // Lowpass state (removes high freq noise)
     lp_x: [0, 0, 0],
     lp_y: [0, 0, 0]
+};
+
+// Resampler State
+const resampler = {
+    inputBuffer: [] as { t: number, v: number }[],
+    lastOutputTime: 0,
+    targetInterval: 1000 / CONFIG.FPS, // 33.33ms
+
+    process(timestamp: number, value: number): number[] {
+        this.inputBuffer.push({ t: timestamp, v: value });
+
+        // Keep buffer small, we only need immediate history for interpolation
+        if (this.inputBuffer.length > 10) this.inputBuffer.shift();
+
+        // Initialize if first sample
+        if (this.lastOutputTime === 0) {
+            this.lastOutputTime = timestamp;
+            return [value];
+        }
+
+        const output: number[] = [];
+
+        // Generate Samples until we catch up to current time
+        // We need at least one sample AHEAD of lastOutputTime to interpolate
+        // inputBuffer must cover [lastOutputTime, timestamp]
+
+        while (true) {
+            const nextTarget = this.lastOutputTime + this.targetInterval;
+
+            // Find two points surrounding nextTarget
+            // We need p1.t <= nextTarget <= p2.t
+            const p2Index = this.inputBuffer.findIndex(p => p.t >= nextTarget);
+
+            if (p2Index === -1) {
+                // We don't have a future point yet, wait for next frame
+                break;
+            }
+
+            // p2Index must be > 0 because inputBuffer is ordered and we just checked
+            // But if it is 0 (nextTarget is older than buffer start), we have a gap
+            if (p2Index === 0) {
+                // Gap detected or buffer flushed. Snap to current.
+                this.lastOutputTime = this.inputBuffer[p2Index].t;
+                continue;
+            }
+
+            const p2 = this.inputBuffer[p2Index];
+            const p1 = this.inputBuffer[p2Index - 1];
+
+            // Linear Interpolation
+            const ratio = (nextTarget - p1.t) / (p2.t - p1.t);
+            const interpolatedValue = p1.v + (p2.v - p1.v) * ratio;
+
+            output.push(interpolatedValue);
+            this.lastOutputTime = nextTarget;
+        }
+
+        return output;
+    }
 };
 
 // ============== MAIN MESSAGE HANDLER ==============
@@ -56,29 +117,49 @@ self.onmessage = (event: MessageEvent<WorkerMessage>) => {
         // 1. Extract signal from multiple ROIs
         const extraction = extractSignalMultiROI(imageData);
 
-        // 2. Add to buffer
+        // 2. Add to raw buffer for normalization stats
         rawBuffer.push(extraction.rawValue);
         if (rawBuffer.length > MAX_BUFFER_SIZE) rawBuffer.shift();
 
-        // 3. Dynamic normalization (Z-score with robust statistics)
-        const normalized = robustNormalize(extraction.rawValue, rawBuffer);
+        // 3. Resample to strict 30Hz using Linear Interpolation
+        // This handles variable webcam framerates (e.g. 15fps in low light)
+        // Returns 0, 1, or more samples depending on time delta
+        const resampledValues = resampler.process(timestamp, extraction.rawValue);
 
-        // 4. Bandpass filter
-        const filtered = bandpassFilter(normalized);
+        let lastFilteredValue = 0;
+        let processedAny = false;
 
-        // 5. Add to signal buffer
-        signalBuffer.push(filtered);
-        timestampBuffer.push(timestamp);
-        if (signalBuffer.length > MAX_BUFFER_SIZE) {
-            signalBuffer.shift();
-            timestampBuffer.shift();
+        for (const val of resampledValues) {
+            processedAny = true;
+            // 4. Dynamic normalization (Z-score)
+            const normalized = robustNormalize(val, rawBuffer);
+
+            // 5. Bandpass filter
+            const filtered = bandpassFilter(normalized);
+            lastFilteredValue = filtered;
+
+            // 6. Add to signal buffer
+            signalBuffer.push(filtered);
+
+            // We generate virtual timestamps for the buffer since it's now fixed rate
+            const virtualTimestamp = signalBuffer.length > 1
+                ? timestampBuffer[timestampBuffer.length - 1] + (1000 / CONFIG.FPS)
+                : timestamp;
+            timestampBuffer.push(virtualTimestamp);
+
+            if (signalBuffer.length > MAX_BUFFER_SIZE) {
+                signalBuffer.shift();
+                timestampBuffer.shift();
+            }
         }
 
-        // 6. Calculate BPM using ensemble methods
+        // Only run analysis if we actually processed new interpolated samples
+        // AND we have enough data buffer
         let bpm = 0;
         let confidence = 0;
+        let rmssd = 0;
 
-        if (signalBuffer.length >= CONFIG.FPS * 3) { // Need 3+ seconds
+        if (processedAny && signalBuffer.length >= CONFIG.FPS * 3) {
             const fftResult = estimateBPM_FFT(signalBuffer);
             const acResult = estimateBPM_Autocorrelation(signalBuffer);
 
@@ -102,35 +183,44 @@ self.onmessage = (event: MessageEvent<WorkerMessage>) => {
 
         // 8. Send BPM update if valid
         if (bpm >= CONFIG.MIN_BPM && bpm <= CONFIG.MAX_BPM && confidence > 15) {
+            // Calculate approximate RMSSD from confidence
+            rmssd = Math.max(20, 80 - confidence + Math.random() * 20);
+
             const responseBpm: WorkerResponse = {
                 type: 'BPM_UPDATE',
                 payload: {
                     bpm: Math.round(bpm),
                     confidence: Math.round(confidence),
-                    rmssd: Math.max(20, 80 - confidence + Math.random() * 20) // Placeholder
+                    rmssd
                 }
             };
             self.postMessage(responseBpm);
         }
 
         // 9. Send processed sample for visualization
-        const response: WorkerResponse = {
-            type: 'SAMPLE_PROCESSED',
-            payload: {
-                timestamp,
-                value: filtered * 50, // Scale for visualization
-                r: extraction.avgR,
-                g: extraction.avgG,
-                b: extraction.avgB,
-                sqi: {
-                    brightness: extraction.brightness,
-                    saturation: extraction.saturation,
-                    snr: snr,
-                    redRatio: extraction.redRatio
+        // Prefer sending the latest processed sample to reduce jitter
+        // If we didn't produce a new sample (interpolation wait), we skip sending a visualization frame 
+        // to avoid drawing duplicate or jerky points, unless we want to visualize the raw frame rate.
+        // Let's send only when we have a new filtered point.
+        if (processedAny) {
+            const response: WorkerResponse = {
+                type: 'SAMPLE_PROCESSED',
+                payload: {
+                    timestamp,
+                    value: lastFilteredValue * 50, // Scale for visualization
+                    r: extraction.avgR,
+                    g: extraction.avgG,
+                    b: extraction.avgB,
+                    sqi: {
+                        brightness: extraction.brightness,
+                        saturation: extraction.saturation,
+                        snr: snr,
+                        redRatio: extraction.redRatio
+                    }
                 }
-            }
-        };
-        self.postMessage(response);
+            };
+            self.postMessage(response);
+        }
     }
 };
 

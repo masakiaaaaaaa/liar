@@ -41,7 +41,10 @@ Key Values: "Party Mode" (Entertainment) and "Training Mode" (Self-care/Basellin
 
 ### Phase 1: PoC & Core Signal Pipeline
 #### [NEW] `src/core/signal/`
-- **Signal Processing**: Implement Bandpass filter (0.7-4.0Hz) and Peak Detection.
+- **Signal Processing**:
+  - **Resampling**: Linear/Cubic Interpolation to normalize variable framerates to fixed 30Hz (Crucial for Webcams).
+  - **Bandpass filter**: 4th-order Butterworth IIR (0.7-4.0Hz).
+  - **Ensemble BPM**: FFT + Autocorrelation.
 - **SQI (Signal Quality Index)**: Implement logic to judge if the finger is placed correctly.
     - Brightness (Red channel active?)
     - Stability (Motion artifacts?)
