@@ -15,13 +15,19 @@ export interface TruthResult {
 }
 
 export const calculateTruthScore = (rmssd: number): TruthResult => {
-    // Clamp typical human range for stress testing
-    // 15ms (Very Stressed) - 60ms (Very Relaxed)
-    const minVal = 15;
-    const maxVal = 60;
+    // Webcam PPG has inherent jitter (noise), inflating RMSSD.
+    // Adjusted range: 40ms (Stressed/Low) - 280ms (Relaxed/High with Noise)
+    const minVal = 40;
+    const maxVal = 280;
 
     const normalized = Math.min(Math.max((rmssd - minVal) / (maxVal - minVal), 0), 1);
-    const score = Math.round(normalized * 100);
+
+    // Cap at 99 to avoid "fake" perfection and add slight deterministic variance
+    let score = Math.round(normalized * 99);
+
+    // Add small fluctuation based on LSB of RMSSD for flavor ( +/- 2 )
+    const flavor = (Math.floor(rmssd) % 5) - 2;
+    score = Math.min(99, Math.max(1, score + flavor));
 
     let label: TruthResult['label'] = 'UNCERTAIN';
     let color = 'text-yellow-400';
