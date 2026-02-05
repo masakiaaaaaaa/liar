@@ -105,83 +105,74 @@ export const SoundManager = {
     },
 
     /**
-     * Start tension-building BGM (dark drone for interrogation atmosphere)
-     * Creates a low-frequency pad with subtle dissonance
+     * Start tension-building BGM (Accelerating Radar/Sonar Ping)
+     * Classic "Time running out" / "Submarine" tension
      */
     startTensionBGM: () => {
         try {
             const ctx = getAudioContext();
-
-            // Master gain for overall volume and fade control
             const master = ctx.createGain();
-            master.gain.setValueAtTime(0.001, ctx.currentTime);
-            master.gain.exponentialRampToValueAtTime(0.15, ctx.currentTime + 2); // Fade in over 2s
+            // Start volume lower
+            master.gain.setValueAtTime(0.3, ctx.currentTime);
             master.connect(ctx.destination);
 
             const oscs: OscillatorNode[] = [];
-            const gains: GainNode[] = [];
 
-            // Layer 1: Deep sub bass drone (40Hz)
-            const osc1 = ctx.createOscillator();
-            const gain1 = ctx.createGain();
-            osc1.type = 'sine';
-            osc1.frequency.value = 40;
-            gain1.gain.value = 0.4;
-            osc1.connect(gain1);
-            gain1.connect(master);
-            oscs.push(osc1);
-            gains.push(gain1);
+            // 1. The Radar Ping (High, Piercing, Recurring)
+            // We'll use a loop of scheduled beeps rather than a continuous LFO primarily
+            // because we want it to sound "electronic" and precise.
 
-            // Layer 2: Low drone with slight detune (82Hz - E2 slightly sharp)
-            const osc2 = ctx.createOscillator();
-            const gain2 = ctx.createGain();
-            osc2.type = 'triangle';
-            osc2.frequency.value = 82.5; // E2 + 5 cents
-            gain2.gain.value = 0.25;
-            osc2.connect(gain2);
-            gain2.connect(master);
-            oscs.push(osc2);
-            gains.push(gain2);
+            const startTime = ctx.currentTime;
+            const duration = 15.0; // Scan duration
 
-            // Layer 3: Dissonant harmonic (minor 2nd interval - creates tension)
-            const osc3 = ctx.createOscillator();
-            const gain3 = ctx.createGain();
-            osc3.type = 'sawtooth';
-            osc3.frequency.value = 87.3; // F2 (minor 2nd above E2)
-            gain3.gain.value = 0.08; // Subtle
-            osc3.connect(gain3);
-            gain3.connect(master);
-            oscs.push(osc3);
-            gains.push(gain3);
+            // The precise scheduling logic
+            let time = startTime;
+            let interval = 1.2; // Start slow
 
-            // Layer 4: High subtle shimmer for eeriness (LFO-modulated)
-            const osc4 = ctx.createOscillator();
-            const gain4 = ctx.createGain();
-            const lfo = ctx.createOscillator();
-            const lfoGain = ctx.createGain();
+            // Schedule pings for the duration of the scan + a bit more
+            while (time < startTime + duration + 1) {
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
 
-            osc4.type = 'sine';
-            osc4.frequency.value = 660; // E5
-            gain4.gain.value = 0.03;
+                osc.type = 'sine';
+                osc.frequency.value = 1200; // High sonar ping
 
-            lfo.type = 'sine';
-            lfo.frequency.value = 0.5; // Very slow modulation
-            lfoGain.gain.value = 0.02;
+                // Envelope: Sharp attack, long decay
+                gain.gain.setValueAtTime(0, time);
+                gain.gain.linearRampToValueAtTime(0.15, time + 0.01);
+                gain.gain.exponentialRampToValueAtTime(0.001, time + 0.4);
 
-            lfo.connect(lfoGain);
-            lfoGain.connect(gain4.gain);
-            osc4.connect(gain4);
-            gain4.connect(master);
+                osc.connect(gain);
+                gain.connect(master);
 
-            oscs.push(osc4);
-            oscs.push(lfo);
-            gains.push(gain4);
-            gains.push(lfoGain);
+                osc.start(time);
+                osc.stop(time + 0.5);
 
-            // Start all oscillators
-            oscs.forEach(o => o.start(ctx.currentTime));
+                // Accelerate: Reduce interval
+                interval = Math.max(0.2, interval * 0.9); // 10% faster each ping
+                time += interval;
+            }
 
-            tensionNodes = { oscs, gains, master };
+            // 2. Underlying Deep Rumble (Continuous)
+            const bass = ctx.createOscillator();
+            const bassGain = ctx.createGain();
+            bass.type = 'sawtooth';
+            bass.frequency.value = 50;
+            // Filter to make it "underwater"
+            const filter = ctx.createBiquadFilter();
+            filter.type = 'lowpass';
+            filter.frequency.value = 200;
+
+            bassGain.gain.setValueAtTime(0.1, startTime);
+            bassGain.gain.linearRampToValueAtTime(0.4, startTime + duration); // Rumble gets louder
+
+            bass.connect(filter);
+            filter.connect(bassGain);
+            bassGain.connect(master);
+            bass.start(startTime);
+            oscs.push(bass);
+
+            tensionNodes = { oscs, gains: [bassGain], master };
         } catch (e) { /* ignore */ }
     },
 
@@ -208,4 +199,3 @@ export const SoundManager = {
         } catch (e) { /* ignore */ }
     }
 };
-
