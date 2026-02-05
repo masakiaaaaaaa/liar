@@ -105,98 +105,119 @@ export const SoundManager = {
     },
 
     /**
-     * Start tension-building BGM (TV Game Show Style)
-     * "Millionaire" thinking music style: Electronic tick + Synth Pad
+     * Start tension-building BGM (Shepard Tone Riser)
+     * "Impressionable" = The sound of infinite rising anxiety.
      */
     startTensionBGM: () => {
         try {
             const ctx = getAudioContext();
             const master = ctx.createGain();
-            master.gain.setValueAtTime(0.4, ctx.currentTime);
+            master.gain.setValueAtTime(0.01, ctx.currentTime);
+            master.gain.linearRampToValueAtTime(0.5, ctx.currentTime + 2.0);
             master.connect(ctx.destination);
 
             const oscs: OscillatorNode[] = [];
 
             const now = ctx.currentTime;
 
-            // 1. The Clock Tick (Filtered Noise or High Hat)
-            // We'll use a loop of scheduled beeps rather than a continuous LFO primarily
-            // because we want it to sound "electronic" and precise.
+            // 1. Shepard Tone Generator (Infinite Riser)
+            // We create 2 parallel sawtooth waves rising over 20s
+            // To create the illusion, as one gets high, it fades out, and a low one fades in.
 
-            let time = now;
-            let interval = 1.0; // Seconds
+            const duration = 20.0;
 
-            // Loop ticks for 20s
-            while (time < now + 20) {
-                const tick = ctx.createOscillator();
-                const tickGain = ctx.createGain();
+            const createRiser = (startFreq: number, endFreq: number) => {
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
 
-                tick.type = 'square'; // Digital sound
-                tick.frequency.value = 800; // High pitch click
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(startFreq, now);
+                osc.frequency.exponentialRampToValueAtTime(endFreq, now + duration);
 
-                tickGain.gain.setValueAtTime(0, time);
-                tickGain.gain.linearRampToValueAtTime(0.05, time + 0.005);
-                tickGain.gain.exponentialRampToValueAtTime(0.001, time + 0.05);
+                // Gain bell curve to hide start/stop
+                // Fade in, hold, fade out
+                gain.gain.setValueAtTime(0, now);
+                gain.gain.linearRampToValueAtTime(0.15, now + 1); // Fade in
+                gain.gain.setValueAtTime(0.15, now + duration - 2);
+                gain.gain.linearRampToValueAtTime(0, now + duration); // Fade out
 
-                tick.connect(tickGain);
-                tickGain.connect(master);
+                // Filter to make it dark
+                const filter = ctx.createBiquadFilter();
+                filter.type = 'lowpass';
+                filter.frequency.value = 400;
+                filter.Q.value = 1;
 
-                tick.start(time);
-                tick.stop(time + 0.1);
+                osc.connect(filter);
+                filter.connect(gain);
+                gain.connect(master);
 
-                // Slight acceleration
-                interval = Math.max(0.2, interval * 0.95);
-                time += interval;
+                osc.start(now);
+                osc.stop(now + duration);
+
+                oscs.push(osc);
+            };
+
+            // Layer the risers
+            createRiser(55, 220); // Low to Mid
+            createRiser(110, 440); // Mid to High
+
+            // 2. Cinematic Thud (Heartbeat / Impact)
+            // Deep, distorted kick every 1.2s -> 0.8s (Accelerating)
+
+            let impactTime = now;
+            let impactInterval = 1.3;
+
+            while (impactTime < now + duration) {
+                const kick = ctx.createOscillator();
+                const kickGain = ctx.createGain();
+
+                kick.frequency.setValueAtTime(100, impactTime);
+                kick.frequency.exponentialRampToValueAtTime(30, impactTime + 0.1);
+
+                kickGain.gain.setValueAtTime(0.6, impactTime);
+                kickGain.gain.exponentialRampToValueAtTime(0.001, impactTime + 0.3);
+
+                // Distort slightly
+                // Simple distortion curve could be added here, but raw sine drop is punchy enough for web
+                // Let's use a triangle for more grit
+                kick.type = 'triangle';
+
+                kick.connect(kickGain);
+                kickGain.connect(master);
+
+                kick.start(impactTime);
+                kick.stop(impactTime + 0.3);
+
+                impactInterval = Math.max(0.6, impactInterval * 0.95); // Accelerate
+                impactTime += impactInterval;
             }
 
-            // 2. The Anxiety Pad (Rising Synth)
-            const pad = ctx.createOscillator();
-            const padGain = ctx.createGain();
+            // 3. High Anxiety Drone (The "Psycho" element)
+            // High pitch sine wave drifting
+            const drone = ctx.createOscillator();
+            const droneGain = ctx.createGain();
 
-            pad.type = 'sawtooth';
-            pad.frequency.setValueAtTime(100, now);
-            // Rise from 100Hz to 200Hz over 15s
-            pad.frequency.linearRampToValueAtTime(200, now + 15);
+            drone.type = 'sine';
+            drone.frequency.setValueAtTime(800, now);
+            drone.frequency.linearRampToValueAtTime(1200, now + duration);
 
-            // Lowpass filter to make it "background"
-            const filter = ctx.createBiquadFilter();
-            filter.type = 'lowpass';
-            filter.frequency.value = 600;
+            const tremolo = ctx.createOscillator();
+            tremolo.frequency.value = 10;
+            const tremoloGain = ctx.createGain();
+            tremoloGain.gain.value = 0.05;
+            tremolo.connect(tremoloGain);
+            tremoloGain.connect(droneGain.gain);
 
-            padGain.gain.setValueAtTime(0, now);
-            padGain.gain.linearRampToValueAtTime(0.2, now + 2); // Fade in
+            droneGain.gain.value = 0.02; // Very subtle piercing sound
 
-            pad.connect(filter);
-            filter.connect(padGain);
-            padGain.connect(master);
+            drone.connect(droneGain);
+            droneGain.connect(master);
 
-            pad.start(now);
-            oscs.push(pad);
+            drone.start(now);
+            tremolo.start(now);
+            oscs.push(drone, tremolo);
 
-            // 3. Digital Pulse (Heartbeat backup)
-            const pulse = ctx.createOscillator();
-            const pulseGain = ctx.createGain();
-            pulse.type = 'sine';
-            pulse.frequency.value = 60;
-
-            const lfo = ctx.createOscillator();
-            lfo.frequency.value = 1.5; // Faster pulse
-            const lfoGain = ctx.createGain();
-            lfoGain.gain.value = 0.5;
-
-            lfo.connect(lfoGain);
-            lfoGain.connect(pulseGain.gain);
-
-            pulseGain.gain.value = 0.2;
-
-            pulse.connect(pulseGain);
-            pulseGain.connect(master);
-
-            pulse.start(now);
-            lfo.start(now);
-            oscs.push(pulse, lfo);
-
-            tensionNodes = { oscs, gains: [padGain, pulseGain], master };
+            tensionNodes = { oscs, gains: [], master };
         } catch (e) { /* ignore */ }
     },
 
