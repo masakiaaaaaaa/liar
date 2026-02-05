@@ -29,7 +29,7 @@ export const useScanner = ({ videoRef, active }: UseScannerProps) => {
                 const { value, sqi: newSqi } = payload;
 
                 bufferRef.current.push(value);
-                if (bufferRef.current.length > 300) {
+                if (bufferRef.current.length > 120) { // Keep last 4 seconds (30fps * 4)
                     bufferRef.current.shift();
                 }
 
@@ -91,6 +91,13 @@ export const useScanner = ({ videoRef, active }: UseScannerProps) => {
         };
 
         if (active) {
+            // Reset state on start
+            bufferRef.current = [];
+            setDataPoints([]);
+            setBpm(0);
+            setConfidence(0);
+            workerRef.current?.postMessage({ type: 'RESET' });
+
             process();
         } else {
             // Reset state when stopped? Maybe keep last result for a bit.

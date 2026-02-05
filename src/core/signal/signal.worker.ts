@@ -109,10 +109,10 @@ const resampler = {
 
 // ============== MAIN MESSAGE HANDLER ==============
 self.onmessage = (event: MessageEvent<WorkerMessage>) => {
-    const { type, payload } = event.data;
+    const message = event.data;
 
-    if (type === 'PROCESS_FRAME') {
-        const { imageData, timestamp } = payload;
+    if (message.type === 'PROCESS_FRAME') {
+        const { imageData, timestamp } = message.payload;
 
         // 1. Extract signal from multiple ROIs
         const extraction = extractSignalMultiROI(imageData);
@@ -221,6 +221,21 @@ self.onmessage = (event: MessageEvent<WorkerMessage>) => {
             };
             self.postMessage(response);
         }
+    } else if (message.type === 'RESET') {
+        // Clear all buffers
+        signalBuffer.length = 0;
+        rawBuffer.length = 0;
+        timestampBuffer.length = 0;
+
+        // Reset Resampler
+        resampler.inputBuffer = [];
+        resampler.lastOutputTime = 0;
+
+        // Reset Filter State
+        filterState.hp_x = [0, 0, 0];
+        filterState.hp_y = [0, 0, 0];
+        filterState.lp_x = [0, 0, 0];
+        filterState.lp_y = [0, 0, 0];
     }
 };
 

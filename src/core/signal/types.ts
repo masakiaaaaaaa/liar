@@ -22,7 +22,8 @@ export interface SQIMetrics {
 
 export type WorkerMessage =
     | { type: 'PROCESS_FRAME'; payload: { imageData: ImageData; timestamp: number } }
-    | { type: 'CONFIG'; payload: { roiGridSize: number } };
+    | { type: 'CONFIG'; payload: { roiGridSize: number } }
+    | { type: 'RESET' };
 
 export type WorkerResponse =
     | { type: 'SAMPLE_PROCESSED'; payload: SignalSample & { sqi: SQIMetrics } }
