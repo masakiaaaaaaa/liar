@@ -22,7 +22,7 @@ export const ScannerOverlay: React.FC<ScannerOverlayProps> = ({ progress, bpm })
                 flexDirection: 'column',
                 alignItems: 'center',
                 justifyContent: 'center',
-                background: 'rgba(225, 29, 72, 0.85)',
+                background: 'rgba(225, 29, 72, 0.30)',
                 borderRadius: '50%',
             }}
             role="status"
