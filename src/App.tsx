@@ -87,12 +87,21 @@ function App() {
       snr: sqi.snr,
       redRatio: sqi.redRatio ?? 0
     };
-    // Finger detection: when finger covers camera, brightness goes UP (from flash/screen light)
-    // AND red channel becomes dominant (blood under skin absorbs non-red light)
+    // Finger detection logic adapted for low light (PC Webcam)
     const brightness = sqi.brightness;
     const redRatio = sqi.redRatio || 0;
-    // Finger present if: brightness is moderate-high AND red is dominant (> 1.3 ratio)
-    const fingerPresent = brightness > 80 && brightness < 250 && redRatio > 1.3;
+
+    // Low Light Mode (Webcam without flash): Brightness might be very low (e.g. 20-50)
+    // In low light, RedRatio might not be dominant. We rely on stability?
+    // Let's relax:
+    // 1. Brightness > 15 (Very dark but not pitch black 0)
+    // 2. Not White Saturated (< 250)
+    // 3. RedRatio > 1.0 (some red/skin tone) OR Low Light (< 40 brightness)
+
+    const isLowLight = brightness < 40;
+    const hasColor = redRatio > 1.05 || (isLowLight && redRatio > 0.9);
+
+    const fingerPresent = brightness > 15 && brightness < 255 && hasColor;
     setIsFingerDetected(fingerPresent);
   }, [sqi]);
 
@@ -112,8 +121,11 @@ function App() {
       const timer = setInterval(() => {
         // Quality Check using redRatio
         const { brightness, redRatio } = latestSqi.current;
-        // Finger present: brightness OK (80-250) AND red dominant (ratio > 1.3)
-        const hasFinger = brightness > 80 && brightness < 250 && (redRatio || 0) > 1.3;
+
+        // Same logic as above
+        const isLowLight = brightness < 40;
+        const hasColor = (redRatio || 0) > 1.05 || (isLowLight && (redRatio || 0) > 0.9);
+        const hasFinger = brightness > 15 && brightness < 255 && hasColor;
 
         if (hasFinger) {
           // Advance progress only when finger is present

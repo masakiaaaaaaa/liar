@@ -130,24 +130,30 @@ function extractSmartSignal(imageData: ImageData, timestamp: number): SignalSamp
     const avgB = sumB / count;
 
     // Smart Channel Selection
-    // If Red is saturated (>240), it's useless (clipping). Switch to Green.
+    // 1. High Light / Flash (Transmission Mode): Red penetrates deep tissue best.
+    // 2. Low Light / Ambient (Reflective Mode): Green has highest hemoglobin absorption coefficient.
+
     let val = 0;
+    const brightness = (avgR + avgG + avgB) / 3;
 
-    // Check saturation logic
-    const isRedSaturated = avgR > 240;
-    const isGreenSaturated = avgG > 240;
+    // Check saturation constraints
+    const isRedSaturated = avgR > 250;
+    const isGreenSaturated = avgG > 250;
 
-    if (!isRedSaturated) {
-        // Red is best for deep tissue/blood
-        // Invert: Systole = more blood = darker image (less reflection)
-        // Signal = -avgR
-        val = -avgR;
-    } else if (!isGreenSaturated) {
-        // Fallback to Green
+    if (brightness < 100) {
+        // Low light (PC Webcam / No Flash) -> Use GREEN (Reflective PPG)
+        // Green signal is usually strongest in reflective mode
         val = -avgG;
     } else {
-        // Fallback to Blue (rarely used but better than clipping)
-        val = -avgB;
+        // High light (Flash active) -> Use RED (Transmission PPG)
+        // Or if Red is valid and not saturated
+        if (!isRedSaturated) {
+            val = -avgR;
+        } else if (!isGreenSaturated) {
+            val = -avgG;
+        } else {
+            val = -avgB;
+        }
     }
 
     return {
@@ -157,10 +163,11 @@ function extractSmartSignal(imageData: ImageData, timestamp: number): SignalSamp
         g: avgG,
         b: avgB,
         sqi: {
-            brightness: (avgR + avgG + avgB) / 3,
+            brightness: brightness,
             saturation: saturated / count,
             snr: 0,
             redRatio: avgR / ((avgG + avgB) / 2 + 1)
         }
     };
 }
+
