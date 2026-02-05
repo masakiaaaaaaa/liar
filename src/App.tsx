@@ -109,12 +109,13 @@ function App() {
     if (gameState === 'SCANNING') {
       HapticsManager.vibrateSelect();
       SoundManager.playActivate();
+      SoundManager.startTensionBGM(); // Start dark tension BGM
       toggle(true);
 
       // Reset
       setScanProgress(0);
 
-      const duration = 10000;
+      const duration = 15000; // 15 seconds for better HRV measurement
       let elapsedValidTime = 0;
       const startTime = Date.now(); // Keep track for timeout
 
@@ -136,6 +137,7 @@ function App() {
 
           if (p >= 100) {
             clearInterval(timer);
+            SoundManager.stopTensionBGM(); // Fade out tension BGM
             finalStats.current = { bpm: latestBpm.current, rmssd: latestRmssd.current };
             setGameState('ANALYZING');
           }
