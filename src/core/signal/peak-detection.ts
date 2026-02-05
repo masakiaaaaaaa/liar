@@ -69,13 +69,47 @@ export class PeakDetector {
                     this.localMax = value;
                     this.localMaxTime = timestamp;
                 }
+
                 // Detect peak when slope turns negative (after positive)
+                // This means index T-1 was the peak candidate
                 if (slope < 0 && prevSlope >= 0) {
+                    // Refine right now!
+                    // y3 = value (current)
+                    // y2 = this.prevValue (peak candidate)
+                    // y1 = this.prevPrevValue (pre-peak)
+
+                    // We need timestamps too. 
+                    // T(y3) = timestamp
+                    // T(y2) = timestamp - (approx 33ms) -> Use stored time?
+                    // Let's infer dt from current timestamp difference if possible, or assume 33ms.
+                    // Ideally we should have passed prevTimestamp on the class.
+
+                    // Let's assume equidistant for refinement calc (offset is ratio).
+                    const dt = 33.33; // Approx
+
+                    const y1 = this.prevPrevValue;
+                    const y2 = this.prevValue;
+                    const y3 = value;
+
+                    const denom = 2 * (y1 - 2 * y2 + y3);
+                    if (Math.abs(denom) > 0.0001) {
+                        const offset = (y1 - y3) / denom;
+                        const clampedOffset = Math.max(-0.5, Math.min(0.5, offset));
+
+                        // Adjust localMax
+                        this.localMax = y2 - 0.25 * (y1 - y3) * clampedOffset;
+                        // Time of y2 is (timestamp - dt). Offset is from y2.
+                        this.localMaxTime = (timestamp - dt) + (clampedOffset * dt);
+                    } else {
+                        // Linear/Flat peak
+                        this.localMax = y2;
+                        this.localMaxTime = timestamp - dt;
+                    }
+
                     this.state = 'FALLING';
                 }
                 break;
 
-            case 'FALLING':
                 // Confirm peak when signal drops significantly
                 if (value < this.localMax * 0.7 || value < this.adaptiveThreshold) {
                     // Check minimum interval
@@ -83,6 +117,8 @@ export class PeakDetector {
                     if (interval > this.MIN_INTERVAL_MS) {
                         // Valid peak detected!
                         detectedPeak = { timestamp: this.localMaxTime, value: this.localMax };
+
+                        // Just emit it here for the state machine logic
                         this.lastPeakTime = this.localMaxTime;
 
                         // Store in history for validation

@@ -580,7 +580,14 @@ function App() {
                   fontWeight: 800,
                   color: 'var(--color-secondary)',
                 }}>
-                  {rmssd > 0 ? Math.min(100, Math.round(100 - rmssd)).toString() : '--'}
+                  {(() => {
+                    if (rmssd <= 0) return '--';
+                    // Map RMSSD (ms): Low RMSSD = High Stress. High RMSSD = Relaxed.
+                    // Range: 10ms (Super Stressed) -> 90ms (Super Relaxed)
+                    // Score = 100% (Stressed) -> 0% (Relaxed)
+                    const normalized = Math.max(0, Math.min(100, (1 - (rmssd - 10) / 80) * 100));
+                    return normalized.toFixed(0);
+                  })()}
                 </p>
               </div>
             </div>
