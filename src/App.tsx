@@ -20,6 +20,25 @@ import { QUESTIONS, type Question } from './core/content/questions';
 
 type GameState = 'IDLE' | 'QUESTION' | 'SCANNING' | 'ANALYZING' | 'RESULT';
 
+// Detect in-app browsers (LINE, Facebook, Instagram, etc.) that restrict camera access
+function isInAppBrowser(): boolean {
+  const ua = navigator.userAgent.toLowerCase();
+  const patterns = [
+    'line/',        // LINE
+    'fban',         // Facebook
+    'fbav',         // Facebook App
+    'instagram',    // Instagram
+    'messenger',    // Facebook Messenger
+    'twitter',      // Twitter
+    'wechat',       // WeChat
+    'micromessenger', // WeChat
+    'snapchat',     // Snapchat
+    'pinterest',    // Pinterest
+    'bytedancewebview', // TikTok
+  ];
+  return patterns.some(p => ua.includes(p));
+}
+
 function useContainerWidth() {
   const containerRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(320);
@@ -46,6 +65,7 @@ function App() {
   const { containerRef, width: containerWidth } = useContainerWidth();
   const resultRef = useRef<HTMLDivElement>(null);
   const [showHistory, setShowHistory] = useState(false);
+  const [inAppBrowser] = useState(() => isInAppBrowser());
 
   const isCameraActive = gameState === 'SCANNING' || gameState === 'ANALYZING';
   const [showCameraPreview, setShowCameraPreview] = useState(false);
@@ -387,6 +407,49 @@ function App() {
       >
 
         <>
+          {/* In-App Browser Warning */}
+          {inAppBrowser && (
+            <div style={{
+              width: '100%',
+              padding: 'var(--space-md)',
+              background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
+              borderRadius: 'var(--radius-md)',
+              border: '2px solid #f59e0b',
+              marginBottom: 'var(--space-sm)',
+            }}>
+              <p style={{
+                margin: 0,
+                fontSize: '13px',
+                color: '#92400e',
+                lineHeight: 1.5,
+                textAlign: 'center',
+              }}>
+                ⚠️ <strong>アプリ内ブラウザでは動作しません</strong><br />
+                Safari/Chromeで開いてください
+              </p>
+              <div style={{ display: 'flex', gap: 'var(--space-xs)', justifyContent: 'center', marginTop: 'var(--space-sm)' }}>
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(window.location.href);
+                    alert('URLをコピーしました！Safari/Chromeで開いてください。');
+                  }}
+                  style={{
+                    padding: 'var(--space-xs) var(--space-md)',
+                    background: '#f59e0b',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: 'var(--radius-sm)',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                  }}
+                >
+                  📋 URLをコピー
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Standard Game View */}
 
           {/* Question Card (QUESTION State) */}
