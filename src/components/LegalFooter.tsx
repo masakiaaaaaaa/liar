@@ -40,7 +40,19 @@ export const LegalFooter: React.FC = () => {
                 <div
                     className="modal-backdrop"
                     onClick={() => setShowModal(null)}
-                    style={{ zIndex: 100 }}
+                    style={{
+                        zIndex: 9999,
+                        position: 'fixed',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        background: 'rgba(0,0,0,0.8)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        padding: '20px'
+                    }}
                 >
                     <div
                         className="card animate-slideUp"
