@@ -10,7 +10,7 @@ export interface Peak {
 
 export class PeakDetector {
     private lastPeakTime = 0;
-    private readonly MIN_INTERVAL_MS = 450; // ~133 BPM max (User req: 50-120 range focus)
+    private readonly MIN_INTERVAL_MS = 330; // ~180 BPM max (Allow excited state detection)
     private readonly MAX_INTERVAL_MS = 1500; // 40 BPM min
 
     // State machine for peak detection
