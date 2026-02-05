@@ -140,7 +140,8 @@ export const ResultCard: React.FC<ResultCardProps> = ({ result, bpm, rmssd, peak
                         fontWeight: 700,
                         color: 'var(--color-secondary)'
                     }}>
-                        {Math.min(100, Math.round(100 - rmssd))} <span style={{ fontSize: '11px' }}>%</span>
+                        {/* RMSSD->Nervousness: 10ms=100%, 80ms=0%, clamped */}
+                        {Math.max(0, Math.min(100, Math.round(100 - ((rmssd - 10) / 70) * 100)))} <span style={{ fontSize: '11px' }}>%</span>
                     </p>
                 </div>
             </div>
