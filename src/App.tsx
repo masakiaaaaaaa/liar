@@ -445,6 +445,23 @@ function App() {
               }}>
                 <Trans i18nKey="game.how_to_play" components={{ strong: <strong style={{ color: 'var(--color-primary)' }} />, br: <br /> }} />
               </p>
+
+              {/* Tips Section */}
+              <div style={{
+                marginTop: 'var(--space-md)',
+                paddingTop: 'var(--space-md)',
+                borderTop: '1px dashed var(--color-primary-border)',
+                fontSize: 'clamp(11px, 3vw, 13px)',
+                color: 'var(--color-text-muted)',
+                lineHeight: 1.6,
+              }}>
+                <p style={{ margin: '0 0 var(--space-xs) 0' }}>
+                  {t('tips.camera_hint')}
+                </p>
+                <p style={{ margin: 0 }}>
+                  {t('tips.lighting_hint')}
+                </p>
+              </div>
             </div>
           )}
 

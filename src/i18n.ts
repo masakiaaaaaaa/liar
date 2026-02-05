@@ -53,6 +53,11 @@ const resources = {
       ad: {
         label: "Advertisement"
       },
+      tips: {
+        camera_hint: "📷 Cover the MAIN camera (largest lens, usually top-left)",
+        lighting_hint: "💡 Use in a well-lit room. Too dark = no signal!",
+        multi_camera: "Multiple cameras? Cover the biggest one!"
+      },
       common: {
         start: "Detect Lies!",
         stop: "Stop",
@@ -61,7 +66,8 @@ const resources = {
         loading: "Initializing...",
         switch_lang: "🇯🇵",
         history: "History",
-        close: "Close"
+        close: "Close",
+        got_it: "Got it!"
       }
     }
   },
@@ -116,6 +122,11 @@ const resources = {
       ad: {
         label: "広告"
       },
+      tips: {
+        camera_hint: "📷 メインカメラ（一番大きなレンズ、通常は左上）を塞いでください",
+        lighting_hint: "💡 明るい場所でご使用ください。暗いと信号が取れません！",
+        multi_camera: "カメラが複数ある場合は、一番大きいレンズを塞いでください！"
+      },
       common: {
         start: "ウソを見破る！",
         stop: "停止",
@@ -124,7 +135,8 @@ const resources = {
         loading: "準備中...",
         switch_lang: "🇺🇸",
         history: "履歴",
-        close: "閉じる"
+        close: "閉じる",
+        got_it: "わかった！"
       }
     }
   }
