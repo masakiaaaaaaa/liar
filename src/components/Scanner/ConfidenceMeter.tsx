@@ -10,7 +10,7 @@ export const ConfidenceMeter: React.FC<ConfidenceMeterProps> = ({ sqi }) => {
     const { t } = useTranslation();
 
     const status = useMemo(() => {
-        if (sqi.brightness < 30) return {
+        if (sqi.brightness < 50) return {
             label: t('sqi.too_dark'),
             emoji: '🌑',
             color: 'var(--color-danger)',
