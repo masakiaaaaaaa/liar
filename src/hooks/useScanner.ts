@@ -36,7 +36,15 @@ export const useScanner = ({ videoRef, active }: UseScannerProps) => {
                 setDataPoints([...bufferRef.current]);
                 setSqi(newSqi);
             } else if (type === 'BPM_UPDATE') {
-                setBpm(payload.bpm);
+                // Smooth BPM using Exponential Moving Average (EMA)
+                // Alpha determines responsiveness vs smoothness (0.1 = very smooth, 0.9 = very responsive)
+                const alpha = 0.2;
+                setBpm(prev => {
+                    if (prev === 0) return payload.bpm; // Jump to first value
+                    // Ignore sudden extreme jumps (e.g. > 30 bpm change) unless it persists (not implemented here for simplicity, relying on EMA)
+                    return Math.round(prev * (1 - alpha) + payload.bpm * alpha);
+                });
+
                 setConfidence(payload.confidence);
                 setRmssd(payload.rmssd);
             }

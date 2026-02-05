@@ -16,8 +16,9 @@ import { HistoryStorage } from './core/storage/HistoryStorage';
 import { HistoryModal } from './components/History/HistoryModal';
 import { LegalFooter } from './components/LegalFooter';
 import './index.css';
+import { QUESTIONS, type Question } from './core/content/questions';
 
-type GameState = 'IDLE' | 'SCANNING' | 'ANALYZING' | 'RESULT';
+type GameState = 'IDLE' | 'QUESTION' | 'SCANNING' | 'ANALYZING' | 'RESULT';
 
 function useContainerWidth() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -41,6 +42,7 @@ function useContainerWidth() {
 function App() {
   const { t, i18n } = useTranslation();
   const [gameState, setGameState] = useState<GameState>('IDLE');
+  const [currentQuestion, setCurrentQuestion] = useState<Question | null>(null);
   const { containerRef, width: containerWidth } = useContainerWidth();
   const resultRef = useRef<HTMLDivElement>(null);
   const [showHistory, setShowHistory] = useState(false);
@@ -73,23 +75,61 @@ function App() {
     }
   }, [bpm, gameState]);
 
+  /* New Ref for SQI to access in interval */
+  const latestSqi = useRef({ brightness: 0, saturation: 0, snr: 0 });
+  const [isFingerDetected, setIsFingerDetected] = useState(false);
+
+  useEffect(() => {
+    latestSqi.current = sqi;
+    // Simple brightness check for finger detection UI
+    setIsFingerDetected(sqi.brightness > 30);
+  }, [sqi]);
+
   useEffect(() => {
     if (gameState === 'SCANNING') {
       HapticsManager.vibrateSelect();
       SoundManager.playActivate();
       toggle(true);
-      const startTime = Date.now();
+
+      // Reset
+      setScanProgress(0);
+
       const duration = 10000;
+      let elapsedValidTime = 0;
+      const startTime = Date.now(); // Keep track for timeout
 
       const timer = setInterval(() => {
-        const elapsed = Date.now() - startTime;
-        const p = Math.min((elapsed / duration) * 100, 100);
-        setScanProgress(p);
-        if (p >= 100) {
-          clearInterval(timer);
-          finalStats.current = { bpm: latestBpm.current, rmssd: latestRmssd.current };
-          setGameState('ANALYZING');
+        // Quality Check
+        const { brightness, snr } = latestSqi.current;
+        const hasFinger = brightness > 30 && brightness < 240; // Avoid fully white/black
+        const hasSignal = snr > 0.5; // Basic signal check
+
+        if (hasFinger) {
+          // Advance progress only when finger is present
+          elapsedValidTime += 100;
+
+          // Boost progress if signal is good to make it feel responsive
+          const speedMultiplier = hasSignal ? 1.0 : 0.5;
+
+          const p = Math.min((elapsedValidTime / duration) * 100 * speedMultiplier, 100);
+          setScanProgress(p);
+
+          if (p >= 100) {
+            clearInterval(timer);
+            finalStats.current = { bpm: latestBpm.current, rmssd: latestRmssd.current };
+            setGameState('ANALYZING');
+          }
+        } else {
+          // Finger removed? Maybe decay progress slightly or just pause?
+          // For now, pause.
         }
+
+        // Timeout safety (30s)
+        if (Date.now() - startTime > 30000) {
+          clearInterval(timer);
+          setGameState('IDLE'); // Cancel if taking too long
+        }
+
       }, 100);
 
       return () => clearInterval(timer);
@@ -135,10 +175,10 @@ function App() {
   }, [gameState]);
 
   const handleStart = useCallback(() => {
-    setGameState('SCANNING');
-    setScanProgress(0);
-    setAnalysisProgress(0);
-    setFinalResult(null);
+    // Pick random question
+    const idx = Math.floor(Math.random() * QUESTIONS.length);
+    setCurrentQuestion(QUESTIONS[idx]);
+    setGameState('QUESTION');
   }, []);
 
   const handleRestart = useCallback(() => {
@@ -314,6 +354,48 @@ function App() {
         <>
           {/* Standard Game View */}
 
+          {/* Question Card (QUESTION State) */}
+          {gameState === 'QUESTION' && currentQuestion && (
+            <div className="card animate-scaleIn" style={{ width: '100%', textAlign: 'center', padding: 'var(--space-xl) var(--space-lg)' }}>
+              <span style={{ fontSize: '48px', display: 'block', marginBottom: 'var(--space-md)' }}>🤫</span>
+              <h3 style={{
+                fontSize: 'clamp(20px, 6vw, 24px)',
+                color: 'var(--color-primary)',
+                marginBottom: 'var(--space-lg)',
+                lineHeight: 1.4
+              }}>
+                {i18n.language === 'ja' ? currentQuestion.text.ja : currentQuestion.text.en}
+              </h3>
+              <p style={{ color: 'var(--color-text-secondary)', marginBottom: 'var(--space-xl)', fontSize: '14px' }}>
+                {t('game.question_instruction')}
+              </p>
+              <div style={{ display: 'flex', gap: 'var(--space-md)' }}>
+                <button
+                  onClick={() => {
+                    // Pick another question
+                    const idx = Math.floor(Math.random() * QUESTIONS.length);
+                    setCurrentQuestion(QUESTIONS[idx]);
+                  }}
+                  className="btn btn-secondary"
+                  style={{ flex: 1 }}
+                >
+                  {t('common.skip')}
+                </button>
+                <button
+                  onClick={() => {
+                    setGameState('SCANNING');
+                    setScanProgress(0);
+                    setAnalysisProgress(0);
+                  }}
+                  className="btn btn-primary"
+                  style={{ flex: 1 }}
+                >
+                  {t('common.ready')}
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* How It Works Card (IDLE) */}
           {gameState === 'IDLE' && (
             <div
@@ -339,10 +421,11 @@ function App() {
               style={{
                 width: '100%',
                 padding: 'var(--space-lg)',
-                background: 'var(--gradient-status)',
+                background: isFingerDetected || gameState === 'ANALYZING' ? 'var(--gradient-status)' : 'var(--color-text-muted)',
                 borderRadius: 'var(--radius-xl)',
                 boxShadow: 'var(--shadow-primary)',
                 textAlign: 'center',
+                transition: 'background 0.3s ease'
               }}
               role="status"
               aria-live="polite"
@@ -356,7 +439,7 @@ function App() {
                 letterSpacing: '1px',
                 marginBottom: 'var(--space-sm)',
               }}>
-                {gameState === 'SCANNING' ? t('game.scanning') : t('game.analyzing')}
+                {gameState === 'SCANNING' ? (isFingerDetected ? t('game.scanning') : t('game.place_finger')) : t('game.analyzing')}
               </p>
               <p style={{
                 margin: 0,
@@ -379,15 +462,18 @@ function App() {
               >
                 <div
                   className="progress-bar-fill"
-                  style={{ width: `${currentProgress}%` }}
+                  style={{ width: `${currentProgress}%`, background: isFingerDetected || gameState === 'ANALYZING' ? '#fff' : '#ccc' }}
                 />
               </div>
             </div>
           )}
 
+          {/* Question Display during Result/Scanning (Optional - maybe just show in Result?) */}
+
           {/* Scanner Area */}
           <div
             style={{
+              display: gameState === 'QUESTION' ? 'none' : 'block',
               width: scannerSize,
               height: scannerSize,
               borderRadius: '50%',
@@ -521,8 +607,8 @@ function App() {
                 fontSize: 'clamp(16px, 5vw, 20px)',
               }}
             >
-              <span style={{ fontSize: '24px' }} role="img" aria-hidden="true">🔍</span>
-              {t('common.start')}
+              <span style={{ fontSize: '24px' }} role="img" aria-hidden="true">🃏</span>
+              {t('common.draw_card')}
             </button>
           )}
 

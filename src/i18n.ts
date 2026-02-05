@@ -29,6 +29,10 @@ const resources = {
       },
       sqi: {
         too_dark: "Too dark",
+        draw_card: "Draw Card",
+        skip: "Skip",
+        ready: "I've Answered!",
+        question_instruction: "Answer this question truthfully... or lie?",
         too_bright: "Too bright",
         adjust_finger: "Adjust finger",
         good_signal: "Good!",
