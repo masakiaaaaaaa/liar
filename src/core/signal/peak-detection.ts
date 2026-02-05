@@ -1,3 +1,7 @@
+/**
+ * Improved Peak Detector for PPG Signal
+ * Uses adaptive thresholding and slope-based detection
+ */
 export interface Peak {
     timestamp: number;
     value: number;
@@ -5,45 +9,114 @@ export interface Peak {
 
 export class PeakDetector {
     private lastPeakTime = 0;
-    private minlntervalMs = 250; // 240 BPM limit
-    private runningMean = 0;
-    private runningDev = 0;
-    private alpha = 0.1;
+    private readonly MIN_INTERVAL_MS = 300; // 200 BPM max
+    private readonly MAX_INTERVAL_MS = 1500; // 40 BPM min
+
+    // Adaptive threshold parameters
+    private signalMax = -Infinity;
+    private signalMin = Infinity;
+    private adaptiveThreshold = 0;
+
+    // State machine for peak detection
+    private state: 'LOOKING' | 'RISING' | 'FALLING' = 'LOOKING';
+    private localMax = -Infinity;
+    private localMaxTime = 0;
+    private prevValue = 0;
+    private prevPrevValue = 0;
+
+    // Running statistics
+    private peakHistory: number[] = [];
+    private readonly HISTORY_SIZE = 5;
 
     detect(value: number, timestamp: number): Peak | null {
-        // Update stats
-        const diff = Math.abs(value - this.runningMean);
-        this.runningMean = (1 - this.alpha) * this.runningMean + this.alpha * value;
-        this.runningDev = (1 - this.alpha) * this.runningDev + this.alpha * diff;
+        // Update running min/max for adaptive threshold
+        if (value > this.signalMax) this.signalMax = value;
+        if (value < this.signalMin) this.signalMin = value;
 
-        // Threshold: Mean + k * Deviation
-        // Since signal is centered at 0 (after DC removal), we look for rapid negative inflection?
-        // PPG: Systole is drop in light (if raw). Inverted signal -> Peak is Systole.
-        // We assume input is "Inverted AC" so Systole is Positive Peak.
-        const threshold = this.runningMean + 0.5 * this.runningDev;
+        // Slowly decay min/max to adapt to signal changes
+        const range = this.signalMax - this.signalMin;
+        this.signalMax -= range * 0.001;
+        this.signalMin += range * 0.001;
 
-        // Simple peak finding: look for local maxima?
-        // Real-time peak finding is tricky. We usually wait for value to drop to confirm peak.
-        // For PoC, we just check if > Threshold AND enough time passed. 
-        // This is "Pulse Onset" detection rather than exact Peak. Sufficient for BPM.
+        // Adaptive threshold at 40% of recent range
+        const midpoint = (this.signalMax + this.signalMin) / 2;
+        this.adaptiveThreshold = midpoint + range * 0.15;
 
-        if (value > threshold && (timestamp - this.lastPeakTime > this.minlntervalMs)) {
-            // Potential peak candidate. 
-            // Improvement: Track local max loop.
-            // Let's implement a "State Machine" detector: 
-            // CLIMBING -> FALLING -> PEAK CONFIRMED
+        // Calculate slope (derivative)
+        const slope = value - this.prevValue;
+        const prevSlope = this.prevValue - this.prevPrevValue;
 
-            // Simplified for immediate response:
-            this.lastPeakTime = timestamp;
-            return { timestamp, value };
+        // Update history
+        this.prevPrevValue = this.prevValue;
+        this.prevValue = value;
+
+        // State machine peak detection
+        let detectedPeak: Peak | null = null;
+
+        switch (this.state) {
+            case 'LOOKING':
+                // Looking for signal to rise above threshold
+                if (value > this.adaptiveThreshold && slope > 0) {
+                    this.state = 'RISING';
+                    this.localMax = value;
+                    this.localMaxTime = timestamp;
+                }
+                break;
+
+            case 'RISING':
+                // Track the maximum while rising
+                if (value > this.localMax) {
+                    this.localMax = value;
+                    this.localMaxTime = timestamp;
+                }
+                // Detect peak when slope turns negative (after positive)
+                if (slope < 0 && prevSlope >= 0) {
+                    this.state = 'FALLING';
+                }
+                break;
+
+            case 'FALLING':
+                // Confirm peak when signal drops significantly
+                if (value < this.localMax * 0.7 || value < this.adaptiveThreshold) {
+                    // Check minimum interval
+                    const interval = this.localMaxTime - this.lastPeakTime;
+                    if (interval > this.MIN_INTERVAL_MS) {
+                        // Valid peak detected!
+                        detectedPeak = { timestamp: this.localMaxTime, value: this.localMax };
+                        this.lastPeakTime = this.localMaxTime;
+
+                        // Store in history for validation
+                        this.peakHistory.push(this.localMax);
+                        if (this.peakHistory.length > this.HISTORY_SIZE) {
+                            this.peakHistory.shift();
+                        }
+                    }
+                    this.state = 'LOOKING';
+                    this.localMax = -Infinity;
+                }
+                // Timeout: if stuck in FALLING for too long, reset
+                if (timestamp - this.localMaxTime > 500) {
+                    this.state = 'LOOKING';
+                }
+                break;
         }
 
-        return null;
+        // Timeout: if no peak detected for too long, reset state
+        if (timestamp - this.lastPeakTime > this.MAX_INTERVAL_MS && this.state !== 'LOOKING') {
+            this.state = 'LOOKING';
+        }
+
+        return detectedPeak;
     }
 
     reset() {
         this.lastPeakTime = 0;
-        this.runningMean = 0;
-        this.runningDev = 0;
+        this.signalMax = -Infinity;
+        this.signalMin = Infinity;
+        this.state = 'LOOKING';
+        this.localMax = -Infinity;
+        this.prevValue = 0;
+        this.prevPrevValue = 0;
+        this.peakHistory = [];
     }
 }

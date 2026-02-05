@@ -115,9 +115,11 @@ function processFrame(imageData: ImageData, timestamp: number): SignalSample & {
     const avgG = sumG / count;
     const avgB = sumB / count;
 
-    // Signal Selection: Green usually contains best PPG signal
-    // Invert because higher blood flow = darker image (more absorption)
-    const val = -avgG;
+    // Signal Selection: RED channel works best when finger covers camera with flash
+    // Blood absorbs more light during systole (less red reflected back)
+    // We invert so that systole = peak (positive)
+    // Using RED instead of GREEN because finger+flash shows red dominance
+    const val = -(avgR - 128); // Center around 0 and invert
 
     return {
         timestamp,
