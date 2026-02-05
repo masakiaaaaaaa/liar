@@ -44,7 +44,7 @@ export const CameraView: React.FC<CameraViewProps> = ({
                     width: '100%',
                     height: '100%',
                     objectFit: 'cover',
-                    opacity: showPreview ? 0.5 : 0,
+                    opacity: showPreview ? 0.85 : 0,
                 }}
                 aria-hidden="true"
             />

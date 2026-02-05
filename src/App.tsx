@@ -68,9 +68,8 @@ function App() {
   const [inAppBrowser] = useState(() => isInAppBrowser());
 
   const isCameraActive = gameState === 'SCANNING' || gameState === 'ANALYZING';
-  const [showCameraPreview, setShowCameraPreview] = useState(false);
 
-  const { videoRef, ready, error } = useCamera({ active: isCameraActive || showCameraPreview });
+  const { videoRef, ready, error } = useCamera({ active: isCameraActive });
   const { init, toggle, on, fallbackMode } = useTorch();
   const { dataPoints, sqi, bpm, rmssd, peakCount, confidence } = useScanner({ videoRef, active: ready && isCameraActive });
 
@@ -525,60 +524,6 @@ function App() {
                 <p style={{ margin: 0 }}>
                   {t('tips.lighting_hint')}
                 </p>
-
-                {/* Camera Preview Toggle */}
-                <button
-                  onClick={() => setShowCameraPreview(!showCameraPreview)}
-                  style={{
-                    marginTop: 'var(--space-md)',
-                    padding: 'var(--space-xs) var(--space-md)',
-                    background: showCameraPreview ? 'var(--color-primary)' : 'var(--color-primary-light)',
-                    color: showCameraPreview ? 'white' : 'var(--color-primary)',
-                    border: '1px solid var(--color-primary)',
-                    borderRadius: 'var(--radius-md)',
-                    fontSize: '12px',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s ease'
-                  }}
-                >
-                  📹 {showCameraPreview ? 'プレビューを閉じる' : 'カメラをプレビュー'}
-                </button>
-
-                {/* Camera Preview Video */}
-                {showCameraPreview && (
-                  <div style={{
-                    marginTop: 'var(--space-md)',
-                    borderRadius: 'var(--radius-md)',
-                    overflow: 'hidden',
-                    border: '2px solid var(--color-primary)',
-                    position: 'relative'
-                  }}>
-                    <video
-                      ref={videoRef}
-                      autoPlay
-                      playsInline
-                      muted
-                      style={{
-                        width: '100%',
-                        height: '120px',
-                        objectFit: 'cover',
-                        display: 'block'
-                      }}
-                    />
-                    <div style={{
-                      position: 'absolute',
-                      bottom: '4px',
-                      left: '4px',
-                      background: 'rgba(0,0,0,0.6)',
-                      color: 'white',
-                      fontSize: '10px',
-                      padding: '2px 6px',
-                      borderRadius: '4px'
-                    }}>
-                      👆 このカメラを指で塞いでください
-                    </div>
-                  </div>
-                )}
               </div>
             </div>
           )}
