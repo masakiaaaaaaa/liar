@@ -50,16 +50,29 @@ export const WaveformCanvas: React.FC<WaveformCanvasProps> = ({
             return;
         }
 
-        // Auto-scale
-        let min = Infinity;
-        let max = -Infinity;
-        for (const v of dataPoints) {
-            if (v < min) min = v;
-            if (v > max) max = v;
+        // Apply smoothing (moving average) for noisy signals
+        const smoothWindow = 3;
+        const smoothedData: number[] = [];
+        for (let i = 0; i < dataPoints.length; i++) {
+            let sum = 0;
+            let count = 0;
+            for (let j = Math.max(0, i - smoothWindow); j <= Math.min(dataPoints.length - 1, i + smoothWindow); j++) {
+                sum += dataPoints[j];
+                count++;
+            }
+            smoothedData.push(sum / count);
         }
 
+        // Auto-scale with outlier rejection (use percentiles instead of min/max)
+        const sorted = [...smoothedData].sort((a, b) => a - b);
+        const p5 = sorted[Math.floor(sorted.length * 0.05)];
+        const p95 = sorted[Math.floor(sorted.length * 0.95)];
+
+        let min = p5;
+        let max = p95;
+
         const range = max - min;
-        const padding = range * 0.1 || 10;
+        const padding = range * 0.15 || 10;
         const plotMin = min - padding;
         const plotMax = max + padding;
         const plotRange = plotMax - plotMin || 1;
@@ -75,11 +88,13 @@ export const WaveformCanvas: React.FC<WaveformCanvasProps> = ({
         ctx.lineJoin = 'round';
         ctx.beginPath();
 
-        const stepX = actualWidth / (dataPoints.length - 1);
+        const stepX = actualWidth / (smoothedData.length - 1);
 
-        dataPoints.forEach((val, idx) => {
+        smoothedData.forEach((val, idx) => {
             const x = idx * stepX;
-            const y = ((val - plotMin) / plotRange) * actualHeight;
+            // Invert Y: canvas Y grows downward, but we want peaks to go UP
+            const normalizedY = (val - plotMin) / plotRange;
+            const y = actualHeight - (normalizedY * actualHeight);
 
             if (idx === 0) ctx.moveTo(x, y);
             else ctx.lineTo(x, y);
