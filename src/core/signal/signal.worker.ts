@@ -530,7 +530,32 @@ function estimateBPM_Autocorrelation(signal: number[]): { bpm: number; confidenc
         }
     }
 
-    const bpm = (60 * CONFIG.FPS) / bestLag;
+    // Refine bestLag using parabolic interpolation for sub-sample precision
+    // This allows BPM resolution better than the discrete frame steps (which are ~2BPM apart at 60BPM)
+    let refinedLag = bestLag;
+    if (bestLag > minLag && bestLag < maxLag) {
+        // We need correlation values at lag-1, lag, lag+1
+        // Re-calculate neighbors since we didn't store all of them
+        // (Or we could assume we are inside loop but loop is finished)
+        // Let's re-calc neighbors for safety
+        const getCorr = (l: number) => {
+            let s = 0;
+            for (let i = 0; i < n - l; i++) s += centered[i] * centered[i + l];
+            return s / (n - l);
+        };
+
+        const yMinus = getCorr(bestLag - 1);
+        const yCenter = maxCorr;
+        const yPlus = getCorr(bestLag + 1);
+
+        const denominator = 2 * (2 * yCenter - yMinus - yPlus);
+        if (Math.abs(denominator) > 0.0001) {
+            const delta = (yMinus - yPlus) / denominator;
+            refinedLag = bestLag + delta;
+        }
+    }
+
+    const bpm = (60 * CONFIG.FPS) / refinedLag;
 
     // Confidence: ratio of peak to mean correlation
     const variance = centered.reduce((a, b) => a + b * b, 0) / n;
