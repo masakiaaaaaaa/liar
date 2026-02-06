@@ -112,7 +112,9 @@ export const ResultCard: React.FC<ResultCardProps> = ({ result, bpm, rmssd, peak
             style={{
                 width: '100%',
                 maxWidth: 'min(360px, calc(100vw - 40px))',
-                padding: 'var(--space-xl) var(--space-lg)',
+                maxHeight: 'calc(100dvh - 80px)', // Prevent overflow on small screens
+                overflowY: 'auto', // Enable scrolling when content overflows
+                padding: 'clamp(12px, 3vw, 24px) clamp(12px, 3vw, 20px)', // Responsive padding
                 textAlign: 'center',
             }}
             role="article"
@@ -122,8 +124,8 @@ export const ResultCard: React.FC<ResultCardProps> = ({ result, bpm, rmssd, peak
             <div
                 className="animate-bounce"
                 style={{
-                    fontSize: 'clamp(60px, 20vw, 80px)',
-                    marginBottom: 'var(--space-md)',
+                    fontSize: 'clamp(48px, 15vw, 80px)',
+                    marginBottom: 'clamp(8px, 2vw, 16px)',
                 }}
                 role="img"
                 aria-label={isLie ? t('result.lie_title') : t('result.truth_title')}
@@ -167,25 +169,25 @@ export const ResultCard: React.FC<ResultCardProps> = ({ result, bpm, rmssd, peak
             </p>
 
             <p style={{
-                margin: '0 0 var(--space-lg) 0',
-                fontSize: 'clamp(40px, 15vw, 56px)',
+                margin: '0 0 clamp(12px, 3vw, 24px) 0',
+                fontSize: 'clamp(32px, 12vw, 56px)',
                 fontWeight: 800,
                 color: isLie ? 'var(--color-danger)' : 'var(--color-success)',
                 lineHeight: 1,
             }}>
                 {result.score}
-                <span style={{ fontSize: 'clamp(16px, 5vw, 20px)', color: 'var(--color-text-muted)', fontWeight: 400 }}>/100</span>
+                <span style={{ fontSize: 'clamp(14px, 4vw, 20px)', color: 'var(--color-text-muted)', fontWeight: 400 }}>/100</span>
             </p>
 
             {/* Message */}
             <p style={{
-                margin: '0 0 var(--space-lg) 0',
-                padding: 'var(--space-md)',
+                margin: '0 0 clamp(8px, 2vw, 24px) 0',
+                padding: 'clamp(8px, 2vw, 16px)',
                 background: '#f9fafb',
                 borderRadius: 'var(--radius-md)',
-                fontSize: 'clamp(12px, 3.5vw, 14px)',
+                fontSize: 'clamp(11px, 3vw, 14px)',
                 color: 'var(--color-text-secondary)',
-                lineHeight: 1.6,
+                lineHeight: 1.5,
                 whiteSpace: 'pre-line',
             }}>
                 {isLie ? t('result.lie_msg') : t('result.truth_msg')}

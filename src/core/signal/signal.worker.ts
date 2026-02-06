@@ -245,26 +245,33 @@ self.onmessage = (event: MessageEvent<WorkerMessage>) => {
             const fftResult = estimateBPM_FFT(signalBuffer);
             const acResult = estimateBPM_Autocorrelation(signalBuffer);
 
-            // 3. Ensemble Fusion
-            if (timeDomainConf > 80) {
-                bpm = timeDomainBPM;
-                confidence = timeDomainConf;
-            } else {
-                // Determine agreement
-                const methods = [
-                    { src: 'FFT', bpm: fftResult.bpm, conf: fftResult.confidence },
-                    { src: 'AC', bpm: acResult.bpm, conf: acResult.confidence },
-                    { src: 'TD', bpm: timeDomainBPM, conf: timeDomainConf }
-                ].filter(m => m.conf > 10 && m.bpm > 0);
+            // 3. Ensemble Fusion (Weighted Average)
+            // Instead of picking one winner, we fuse all valid methods proportional to their confidence.
+            const methods = [
+                { src: 'FFT', bpm: fftResult.bpm, conf: fftResult.confidence },
+                { src: 'AC', bpm: acResult.bpm, conf: acResult.confidence },
+                { src: 'TD', bpm: timeDomainBPM, conf: timeDomainConf }
+            ].filter(m => m.conf > 15 && m.bpm >= CONFIG.MIN_BPM && m.bpm <= CONFIG.MAX_BPM);
 
-                if (methods.length > 0) {
-                    // Pick method with highest confidence
-                    methods.sort((a, b) => b.conf - a.conf);
-                    bpm = methods[0].bpm;
-                    confidence = methods[0].conf;
+            if (methods.length > 0) {
+                // Weighted average: sum(bpm * conf) / sum(conf)
+                const totalWeight = methods.reduce((a, m) => a + m.conf, 0);
+                const weightedBPM = methods.reduce((a, m) => a + m.bpm * m.conf, 0) / totalWeight;
+                bpm = weightedBPM;
 
-                    const agreed = methods.filter(m => Math.abs(m.bpm - bpm) < 10).length;
-                    if (agreed > 1) confidence = Math.min(100, confidence + 20);
+                // Confidence: base is average, boosted by agreement
+                const baseConf = totalWeight / methods.length;
+
+                // Agreement check: how many methods are within 10 BPM of the weighted result?
+                const agreeing = methods.filter(m => Math.abs(m.bpm - bpm) < 10).length;
+
+                // Strong agreement (all 3) = big boost, 2 = small boost
+                if (agreeing >= 3) {
+                    confidence = Math.min(100, baseConf + 25);
+                } else if (agreeing >= 2) {
+                    confidence = Math.min(100, baseConf + 10);
+                } else {
+                    confidence = baseConf;
                 }
             }
 
