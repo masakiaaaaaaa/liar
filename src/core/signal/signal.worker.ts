@@ -127,9 +127,9 @@ self.onmessage = (event: MessageEvent<WorkerMessage>) => {
         const extraction = extractSignalMultiROI(imageData);
 
         // 0. Validity Check (Is finger present and signal good?)
-        // Brightness and Saturation are instant checks.
-        // We defer SNR check because SNR is statistical and calculated at the end.
-        const isFingerPresent = extraction.brightness > 40 && extraction.saturation > 0.05;
+        // Fix: 'saturation' here measures CLIPPING (pixels > 250), so a good exposure (R=200) has 0 saturation!
+        // We should check Red Ratio instead to ensure it's a finger.
+        const isFingerPresent = extraction.brightness > 20 && extraction.redRatio > 1.2;
         const isValidFrame = isFingerPresent;
 
         // Store validity for window analysis
