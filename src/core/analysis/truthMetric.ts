@@ -16,9 +16,10 @@ export interface TruthResult {
 
 export const calculateTruthScore = (rmssd: number): TruthResult => {
     // Webcam PPG has inherent jitter (noise), inflating RMSSD.
-    // Adjusted range: 40ms (Stressed/Low) - 280ms (Relaxed/High with Noise)
-    const minVal = 40;
-    const maxVal = 280;
+    // Adjusted range: 30ms (Stressed/Low) - 140ms (Relaxed/High)
+    // 108ms (User case) -> ~70% Score (Truth)
+    const minVal = 30;
+    const maxVal = 140;
 
     const normalized = Math.min(Math.max((rmssd - minVal) / (maxVal - minVal), 0), 1);
 
