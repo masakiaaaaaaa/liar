@@ -8,151 +8,111 @@ export type Question = {
 };
 
 export const QUESTIONS: Question[] = [
-    // --- HARD / EDGY ---
+    // --- CATEGORY A: ROMANCE (DANGER) ---
     {
-        id: 'h1',
-        text: { en: "Can you show your browser history right now?", ja: "スマホの検索履歴を今すぐ全員に見せられる？" },
-        category: 'hard'
-    },
-    {
-        id: 'h2',
-        text: { en: "Is there someone here you explicitly dislike?", ja: "実はこの中に「苦手」な人がいる？" },
-        category: 'hard'
-    },
-    {
-        id: 'h3',
-        text: { en: "Would you break up with your partner for $1 million?", ja: "もし1億円もらえるなら、今のパートナーと別れられる？" },
-        category: 'hard'
-    },
-    {
-        id: 'h4',
-        text: { en: "Have you ever revealed a friend's secret?", ja: "親友の秘密を他人にバラしたことがある？" },
-        category: 'hard'
-    },
-    {
-        id: 'h5',
-        text: { en: "Do you think you are smarter than everyone here?", ja: "正直、この中で自分が一番賢いと思っている？" },
-        category: 'hard'
-    },
-    {
-        id: 'h6',
-        text: { en: "Have you ever stolen something?", ja: "過去に（小さなものでも）何かを盗んだことがある？" },
-        category: 'hard'
-    },
-    {
-        id: 'h7',
-        text: { en: "Do you hate your boss?", ja: "正直、今の上司（または先生）が嫌い？" },
-        category: 'hard'
-    },
-
-    // --- ROMANCE / LOVE ---
-    {
-        id: 'r1',
-        text: { en: "Are you lying to your partner right now?", ja: "今の恋人（または好きな人）に隠し事をしている？" },
+        id: 'a1',
+        text: { en: "Do you sometimes think your ex was better than your current partner?", ja: "今のパートナーよりも、元恋人の方が良かったと思うことがある？" },
         category: 'romance'
     },
     {
-        id: 'r2',
-        text: { en: "Have you ever cheated on someone?", ja: "ここだけの話、浮気をしたことがある？" },
+        id: 'a2',
+        text: { en: "Do you have a secret you will take to your grave?", ja: "パートナーに絶対に言えない、墓場まで持っていく秘密がある？" },
+        category: 'secret'
+    },
+    {
+        id: 'a3',
+        text: { en: "Would you break up with your partner for $10 million?", ja: "もし10億円もらえるなら、今のパートナーと別れられる？" },
+        category: 'hard'
+    },
+    {
+        id: 'a4',
+        text: { en: "Is there someone here you would sleep with if you were single?", ja: "この中で、フリーなら一夜を共にしてもいいと思う人がいる？" },
         category: 'romance'
     },
     {
-        id: 'r3',
-        text: { en: "Do you still have feelings for an ex?", ja: "元カレ・元カノにまだ未練がある？" },
-        category: 'romance'
-    },
-    {
-        id: 'r4',
-        text: { en: "Have you ever checked your partner's phone?", ja: "恋人のスマホを勝手に見たことがある？" },
-        category: 'romance'
-    },
-    {
-        id: 'r5',
-        text: { en: "Have you ever fallen for a friend's partner?", ja: "友達の恋人を好きになったことがある？" },
-        category: 'romance'
-    },
-    {
-        id: 'r6',
-        text: { en: "Do you check your ex's social media?", ja: "別れた後も元恋人のSNSをチェックしてしまう？" },
-        category: 'romance'
-    },
-    {
-        id: 'r7',
-        text: { en: "Have you dated more than 10 people?", ja: "付き合った人数は10人以上？" },
+        id: 'a5',
+        text: { en: "Are you cheating (or have you cheated recently)?", ja: "実は今、浮気をしている（または最近した）？" },
         category: 'romance'
     },
 
-    // --- SECRET / TABOO ---
+    // --- CATEGORY B: FRIENDS (BETRAYAL) ---
     {
-        id: 's1',
-        text: { en: "Do you have a secret social media account?", ja: "誰にも言っていないSNSの「裏垢」がある？" },
+        id: 'b1',
+        text: { en: "Is there someone here you explicitly dislike?", ja: "実は、この中にどうしても好きになれない（苦手な）人がいる？" },
+        category: 'hard'
+    },
+    {
+        id: 'b2',
+        text: { en: "Have you ever secretly wished for a best friend's failure?", ja: "親友の成功を、心の中で妬んだ（失敗しろと思った）ことがある？" },
         category: 'secret'
     },
     {
-        id: 's2',
-        text: { en: "Have you ever had huge debt?", ja: "大きな借金をしたことがある？（ローン・奨学金以外）" },
+        id: 'b3',
+        text: { en: "Have you ever revealed a friend's secret behind their back?", ja: "ここにいる誰かの秘密を、裏で他の人に暴露したことがある？" },
+        category: 'hard'
+    },
+    {
+        id: 'b4',
+        text: { en: "Have you ever seriously wanted to steal a friend's partner?", ja: "友達の恋人を、本気で奪いたいと思ったことがある？" },
+        category: 'romance'
+    },
+    {
+        id: 'b5',
+        text: { en: "Do you honestly think you are superior to this group?", ja: "正直、このグループの中で自分が一番『格上』だと思っている？" },
+        category: 'hard'
+    },
+
+    // --- CATEGORY C: ETHICS / CRIME ---
+    {
+        id: 'c1',
+        text: { en: "Have you ever committed a crime (like shoplifting)?", ja: "過去に、犯罪（万引きや横領など）に手を染めたことがある？" },
+        category: 'hard'
+    },
+    {
+        id: 'c2',
+        text: { en: "Have you ever kept a lost wallet's money?", ja: "落ちている財布を拾って、中身を自分のものにしたことがある？" },
         category: 'secret'
     },
     {
-        id: 's3',
-        text: { en: "Have you ever had plastic surgery?", ja: "実は整形したことがある（または本気でしたい）？" },
+        id: 'c3',
+        text: { en: "Have you ever stolen money from your parents?", ja: "親や家族の財布から、お金を盗んだことがある？" },
         category: 'secret'
     },
     {
-        id: 's4',
-        text: { en: "Have you gone a week without showering?", ja: "1週間以上、お風呂に入らなかったことがある？" },
-        category: 'secret'
+        id: 'c4',
+        text: { en: "Would you sabotage a colleague to get promoted?", ja: "自分が出世するためなら、同僚を蹴落とすことも厭わない？" },
+        category: 'hard'
     },
     {
-        id: 's5',
-        text: { en: "Have you picked up found money?", ja: "落ちていたお金をこっそりポケットに入れたことがある？" },
-        category: 'secret'
-    },
-    {
-        id: 's6',
-        text: { en: "Have you lied about your age?", ja: "年齢をサバ読んだことがある？" },
-        category: 'secret'
-    },
-    {
-        id: 's7',
-        text: { en: "Do you have a fetish you can't tell anyone?", ja: "誰にも言えないフェチがある？" },
+        id: 'c5',
+        text: { en: "Have you had (or are saving for) plastic surgery?", ja: "整形している（または、本気で整形しようと貯金している）？" },
         category: 'secret'
     },
 
-    // --- FUNNY / ICE BREAKER ---
+    // --- CATEGORY D: PRIDE / NARCISSIST ---
     {
-        id: 'f1',
-        text: { en: "Do you think you're good looking?", ja: "鏡を見るたびに「自分はイケてる」と思う？" },
+        id: 'd1',
+        text: { en: "Do you genuinely think you are beautiful/handsome?", ja: "鏡を見るたびに『自分は美しい/カッコいい』と本気で思っている？" },
         category: 'funny'
     },
     {
-        id: 'f2',
-        text: { en: "Have you ever blamed a fart on someone else?", ja: "自分のおならを他人のせいにしたことがある？" },
+        id: 'd2',
+        text: { en: "Do you sometimes seriously think you might be a genius?", ja: "実は、自分は天才なんじゃないかと真剣に思うことがある？" },
         category: 'funny'
     },
     {
-        id: 'f3',
-        text: { en: "Do you talk to yourself?", ja: "一人でいる時、声に出して独り言を言う？" },
+        id: 'd3',
+        text: { en: "Do you judge your worth by social media likes?", ja: "SNSの『いいね』の数で、自分の価値が決まると思っている？" },
         category: 'funny'
     },
     {
-        id: 'f4',
-        text: { en: "Have you ever practiced kissing properly?", ja: "キスの練習を手の甲や枕でしたことがある？" },
+        id: 'd4',
+        text: { en: "Would you get naked if it made you famous?", ja: "有名になるためなら、裸になってもいい？" },
         category: 'funny'
     },
     {
-        id: 'f5',
-        text: { en: "Do you sleep with a stuffed animal?", ja: "今でもぬいぐるみと一緒に寝ている？" },
-        category: 'funny'
-    },
-    {
-        id: 'f6',
-        text: { en: "Have you picked your nose in public?", ja: "誰も見ていないと思って鼻をほじったことがある？" },
-        category: 'funny'
-    },
-    {
-        id: 'f7',
-        text: { en: "Do you believe in aliens?", ja: "宇宙人は絶対にいると思う？" },
+        id: 'd5',
+        text: { en: "Do you honestly think everyone else is an idiot?", ja: "正直、自分以外の人間はバカばかりだと思っている？" },
         category: 'funny'
     }
 ];
