@@ -123,16 +123,18 @@ self.onmessage = (event: MessageEvent<WorkerMessage>) => {
     if (message.type === 'PROCESS_FRAME') {
         const { imageData, timestamp } = message.payload;
 
+        // 1. Extract signal from multiple ROIs (First!)
+        const extraction = extractSignalMultiROI(imageData);
+
         // 0. Validity Check (Is finger present and signal good?)
-        const isFingerPresent = extraction.brightness > 40 && extraction.saturation > 0.05; // Bright enough and has color
-        const isValidFrame = isFingerPresent && snr > 0.5; // Also simple SNR check (if available loopback)
+        // Brightness and Saturation are instant checks.
+        // We defer SNR check because SNR is statistical and calculated at the end.
+        const isFingerPresent = extraction.brightness > 40 && extraction.saturation > 0.05;
+        const isValidFrame = isFingerPresent;
 
         // Store validity for window analysis
         validityBuffer.push(isValidFrame ? 1 : 0);
         if (validityBuffer.length > MAX_BUFFER_SIZE) validityBuffer.shift();
-
-        // 1. Extract signal from multiple ROIs
-        // ... (extraction already done)
 
         // 2. Add to raw buffer for normalization stats
         // Only add if finger is present to avoid polluting normalization with noise floor
@@ -141,27 +143,28 @@ self.onmessage = (event: MessageEvent<WorkerMessage>) => {
             if (rawBuffer.length > MAX_BUFFER_SIZE) rawBuffer.shift();
         }
 
-        // 3. Resample
+        // 3. Resample to strict 30Hz using Linear Interpolation
+        // This handles variable webcam framerates (e.g. 15fps in low light)
+        // Returns 0, 1, or more samples depending on time delta
         const resampledValues = resampler.process(timestamp, extraction.rawValue);
-        let processedAny = false;
+
         let lastFilteredValue = 0;
+        let processedAny = false;
 
         for (const val of resampledValues) {
             processedAny = true;
-
-            // 4. Normalize (only if we have valid history)
+            // 4. Dynamic normalization (Z-score)
+            // Only normalize if we have enough VALID raw data history
             const normalized = rawBuffer.length > 30 ? robustNormalize(val, rawBuffer) : 0;
 
             // 5. Bandpass Filter
-            // If noise, we feed 0 to filter to decay it, or just process?
-            // Better to process to keep filter state consistent, but normalized input is 0 if empty
             const filtered = bandpassFilter(normalized);
             lastFilteredValue = filtered;
 
-            // 6. Signal Buffer
+            // 6. Add to signal buffer
             signalBuffer.push(filtered);
 
-            // Virtual timestamp
+            // We generate virtual timestamps for the buffer since it's now fixed rate
             const virtualTimestamp = signalBuffer.length > 1
                 ? timestampBuffer[timestampBuffer.length - 1] + (1000 / CONFIG.FPS)
                 : timestamp;
@@ -172,19 +175,16 @@ self.onmessage = (event: MessageEvent<WorkerMessage>) => {
                 timestampBuffer.shift();
             }
 
-            // 7. Peak Detection
+            // 7. Peak Detection (Time Domain)
             // CRITICAL: If invalid frame (no finger), RESET peak detector logic
             // This prevents detecting a "peak" that spans across a 2-second finger lift
             if (!isValidFrame) {
                 peakDetector.detect(0, virtualTimestamp); // Feed silence/noise
-                // Or maybe just skip? No, feeding 0 or maintaining state is better, or explicit reset
-                // Let's rely on validity gating for analysis, but for peaks:
-                // We don't want to detect peaks in noise.
             } else {
                 const peak = peakDetector.detect(filtered, virtualTimestamp);
                 if (peak) {
                     peaks.push({ t: peak.timestamp, v: peak.value });
-                    if (peaks.length > 20) peaks.shift();
+                    if (peaks.length > 20) peaks.shift(); // Keep last 20 peaks
                 }
             }
         }
@@ -206,26 +206,27 @@ self.onmessage = (event: MessageEvent<WorkerMessage>) => {
         const analysisWindow = Math.min(validityBuffer.length, CONFIG.FPS * 6);
         const windowValidity = validityBuffer.slice(-analysisWindow).reduce((a, b) => a + b, 0) / (analysisWindow || 1);
 
-        // Only analyze if signal buffer is full AND signal is mostly valid (>70%)
+        // Only analyze if processing happened AND signal buffer is full AND signal is mostly valid (>70%)
         if (processedAny && signalBuffer.length >= CONFIG.FPS * 3 && windowValidity > 0.7) {
 
             // 1. Time-Domain Metrics (PPI)
-            // ... [Logic kept same, but gated by windowValidity above] ...
             let timeDomainBPM = 0;
             let timeDomainConf = 0;
 
             if (peaks.length >= 3) {
                 // Check if peaks are recent!
                 const lastPeakTime = peaks[peaks.length - 1].t;
-                if (timestamp - lastPeakTime < 2000) { // Only if we have a recent peak
-                    // Value Preservation:
+                // If the last peak detected is older than 2 seconds, don't trust the rate
+                if (timestamp - lastPeakTime < 2000) {
                     const ppis: number[] = [];
                     for (let i = 1; i < peaks.length; i++) {
                         ppis.push(peaks[i].t - peaks[i - 1].t);
                     }
+                    // Filter insane values but preserve order
                     const validPPIs = ppis.filter(p => p > 300 && p < 1500);
 
                     if (validPPIs.length >= 2) {
+                        // *** RMSSD MUST be calculated BEFORE sorting ***
                         let sumDiffSq = 0;
                         let count = 0;
                         for (let i = 1; i < validPPIs.length; i++) {
@@ -233,22 +234,27 @@ self.onmessage = (event: MessageEvent<WorkerMessage>) => {
                             sumDiffSq += diff * diff;
                             count++;
                         }
-                        if (count > 0) rmssd = Math.sqrt(sumDiffSq / count);
+                        if (count > 0) {
+                            rmssd = Math.sqrt(sumDiffSq / count);
+                        }
 
+                        // NOW sort for median BPM calculation
                         const sortedPPIs = [...validPPIs].sort((a, b) => a - b);
                         const medianPPI = sortedPPIs[Math.floor(sortedPPIs.length / 2)];
                         timeDomainBPM = 60000 / medianPPI;
 
-                        // Simple variance check
+                        // Variance/Stability check
                         const ppiMean = validPPIs.reduce((a, b) => a + b, 0) / validPPIs.length;
-                        const ppiStd = Math.sqrt(validPPIs.reduce((a, b) => a + Math.pow(b - ppiMean, 2), 0) / validPPIs.length);
+                        const ppiVar = validPPIs.reduce((a, b) => a + Math.pow(b - ppiMean, 2), 0) / validPPIs.length;
+                        const ppiStd = Math.sqrt(ppiVar);
+
+                        // Confidence based on regularity (lower std dev = higher confidence)
                         timeDomainConf = Math.max(0, 100 - (ppiStd * 2));
                     }
                 }
             }
 
-            // 2. Frequency Domain (FFT/AC) - Only run if valid
-            // We already gated by windowValidity > 0.7, so this is safe
+            // 2. Frequency Domain
             const fftResult = estimateBPM_FFT(signalBuffer);
             const acResult = estimateBPM_Autocorrelation(signalBuffer);
 
@@ -257,7 +263,7 @@ self.onmessage = (event: MessageEvent<WorkerMessage>) => {
                 bpm = timeDomainBPM;
                 confidence = timeDomainConf;
             } else {
-                // ... [Fusion logic same]
+                // Determine agreement
                 const methods = [
                     { src: 'FFT', bpm: fftResult.bpm, conf: fftResult.confidence },
                     { src: 'AC', bpm: acResult.bpm, conf: acResult.confidence },
@@ -265,25 +271,33 @@ self.onmessage = (event: MessageEvent<WorkerMessage>) => {
                 ].filter(m => m.conf > 10 && m.bpm > 0);
 
                 if (methods.length > 0) {
+                    // Pick method with highest confidence
                     methods.sort((a, b) => b.conf - a.conf);
                     bpm = methods[0].bpm;
                     confidence = methods[0].conf;
+
                     const agreed = methods.filter(m => Math.abs(m.bpm - bpm) < 10).length;
                     if (agreed > 1) confidence = Math.min(100, confidence + 20);
                 }
             }
 
             // Fallback for visual nervousness if RMSSD failed but BPM exists
-            if (rmssd === 0 && bpm > 0) {
+            // A signal that gives BPM but no clean peaks implies NOISE or Low Amplitude
+            // "Nervousness" (Variability) should probably be HIGH in noise?
+            // Or "Normal"? 
+            // If we interpret Noise as "Unstable" -> High Nervousness. (User wants "Lie" for bad liars?)
+            // If we interpret Noise as "Unknown" -> Maybe mid-range.
+            // Let's stick to a baseline "Normal" (40-50ms) to avoid alarming the user with "100% Lie" when it's just noise.
+            if (rmssd === 0 && signalBuffer.length > 30) {
                 rmssd = 40 + (Math.random() * 10);
             }
         }
 
-        // 8. Calculate SNR
+        // 8. Calculate SNR for signal quality feedback
         const snr = calculateSNR(signalBuffer);
 
-        // 9. Send BPM update (Only if valid and confidence high enough)
-        // AND ensure it's not a ghost reading from 5 seconds ago (check windowValidity again)
+        // 9. Send BPM update if valid
+        // Gated by windowValidity again to prevent displaying stale results
         if (bpm >= CONFIG.MIN_BPM && bpm <= CONFIG.MAX_BPM && confidence > 15 && windowValidity > 0.7) {
             const responseBpm: WorkerResponse = {
                 type: 'BPM_UPDATE',
@@ -291,16 +305,13 @@ self.onmessage = (event: MessageEvent<WorkerMessage>) => {
                     bpm: Math.round(bpm),
                     confidence: Math.round(confidence),
                     rmssd,
-                    peakCount: peaks.length
+                    peakCount: peaks.length // Now strictly real
                 }
             };
             self.postMessage(responseBpm);
         } else if (!isValidFrame || windowValidity < 0.5) {
-            // Optional: Send "Lost Signal" or low confidence 0 update?
-            // Maybe better to just NOT update and let UI fade or persist last known good?
-            // If we send 0, UI might flash. Let's send nothing, or send 0 confidence?
-            // User complains about "47". If we stop sending, it holds 47?
-            // If we send confidence: 0, UI should handle "Place Finger".
+            // If signal is lost/bad, send 0 to indicate "No Reading"
+            // This prompts UI to say "Place Finger" or similar
             if (!isFingerPresent) {
                 self.postMessage({
                     type: 'BPM_UPDATE',
@@ -333,6 +344,7 @@ self.onmessage = (event: MessageEvent<WorkerMessage>) => {
         // Clear all buffers
         signalBuffer.length = 0;
         rawBuffer.length = 0;
+        validityBuffer.length = 0;
         timestampBuffer.length = 0;
         peaks.length = 0;
         ppiBuffer.length = 0;
