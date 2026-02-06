@@ -1,65 +1,31 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <!-- Premium Gradient Background -->
-    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#FF3A65;stop-opacity:1" /> <!-- Vivid Rose -->
-      <stop offset="50%" style="stop-color:#FF1A4B;stop-opacity:1" />
-      <stop offset="100%" style="stop-color:#99002E;stop-opacity:1" /> <!-- Deep Crimson -->
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#8b5cf6;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#ec4899;stop-opacity:1" />
     </linearGradient>
-
-    <!-- Glassy Highlight -->
-    <linearGradient id="glassSheen" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#ffffff;stop-opacity:0.3" />
-      <stop offset="40%" style="stop-color:#ffffff;stop-opacity:0.05" />
-      <stop offset="100%" style="stop-color:#ffffff;stop-opacity:0" />
-    </linearGradient>
-
-    <!-- Pulse Glow -->
-    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
-      <feGaussianBlur stdDeviation="6" result="coloredBlur"/>
-      <feMerge>
-        <feMergeNode in="coloredBlur"/>
-        <feMergeNode in="SourceGraphic"/>
-      </feMerge>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="4" flood-color="#000" flood-opacity="0.2"/>
     </filter>
   </defs>
-
-  <!-- Base Squircle (Apple Style) -->
-  <path d="M256,0 C60,0 0,60 0,256 C0,452 60,512 256,512 C452,512 512,452 512,256 C512,60 452,0 256,0 Z" 
-        fill="url(#bgGrad)" />
-
-  <!-- Subtle Inner Shadow/Border for depth -->
-  <path d="M256,8 C440,8 504,72 504,256 C504,440 440,504 256,504 C72,504 8,440 8,256 C8,72 72,8 256,8 Z" 
-        fill="none" stroke="url(#glassSheen)" stroke-width="4" opacity="0.5" />
-
-  <!-- Central Graphic: Abstract Biometric Pulse -->
-  <g transform="translate(96, 96) scale(0.625)" filter="url(#glow)">
-    
-    <!-- Fingerprint Ring 1 (Outer) -->
-    <path d="M100,256 A156,156 0 0,1 412,256" 
-          fill="none" stroke="#fff" stroke-width="24" stroke-linecap="round" opacity="0.3" />
-    <path d="M412,256 A156,156 0 0,1 350,380" 
-          fill="none" stroke="#fff" stroke-width="24" stroke-linecap="round" opacity="0.15" />
-
-    <!-- Fingerprint Ring 2 (Middle) -->
-    <path d="M150,256 A106,106 0 0,1 362,256" 
-          fill="none" stroke="#fff" stroke-width="24" stroke-linecap="round" opacity="0.5" />
-    
-    <!-- The Heartbeat Pulse (Sharp, Digital, Glowing) -->
-    <path d="M60,280 L140,280 L180,180 L230,360 L290,140 L340,280 L452,280" 
-          fill="none" 
-          stroke="#fff" 
-          stroke-width="32" 
-          stroke-linecap="round" 
-          stroke-linejoin="round" />
-          
-    <!-- Decorative Center Dot (Focus Point) -->
-    <circle cx="256" cy="256" r="12" fill="#fff" opacity="0.9" />
-
-  </g>
-
-  <!-- Glass Gloss Reflection (Top Left) -->
-  <path d="M256,0 C60,0 0,60 0,256 C0,200 20,100 100,50 C180,10 256,0 256,0 Z" 
-        fill="url(#glassSheen)" opacity="0.6" />
-
+  
+  <!-- Background: Squircle -->
+  <rect x="0" y="0" width="512" height="512" rx="100" fill="url(#bg)" />
+  
+  <!-- Face: Yellow Circle -->
+  <circle cx="256" cy="256" r="160" fill="#facc15" filter="url(#shadow)" />
+  
+  <!-- Eyes -->
+  <ellipse cx="200" cy="220" rx="15" ry="25" fill="#1e293b" />
+  <ellipse cx="312" cy="220" rx="15" ry="25" fill="#1e293b" />
+  
+  <!-- Long Nose (Pinocchio Style) -->
+  <!-- Base at 256,260. Extending to Right/Up. -->
+  <path d="M256 250 Q 230 270 256 290 L 420 270 Q 430 250 420 230 Z" fill="#fbbf24" stroke="#d97706" stroke-width="4" stroke-linejoin="round" />
+  
+  <!-- Smile (Mischievous) -->
+  <path d="M200 320 Q 256 360 312 300" fill="none" stroke="#1e293b" stroke-width="12" stroke-linecap="round" />
+  
+  <!-- Sweat Drop (Comedy) -->
+  <path d="M160 200 Q 140 180 160 160 Q 180 180 160 200 Z" fill="#3b82f6" opacity="0.8" />
 </svg>
