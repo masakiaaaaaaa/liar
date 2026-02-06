@@ -45,11 +45,21 @@ export const QUESTIONS: Question[] = [
         category: 'secret'
     },
 
-    // --- COMPATIBLE FILLERS (Fun/Mildly Edgy) ---
+    // --- COMPATIBLE FILLERS (Refined) ---
     {
-        id: 'f1',
-        text: { en: "Do you have a secret social media account?", ja: "誰にも言っていないSNSの「裏垢」がある？" },
+        id: 'f_new1',
+        text: { en: "Honestly, do you think looks are 90% of attraction?", ja: "正直、異性の好みは『顔』が9割だと思う？" },
         category: 'secret'
+    },
+    {
+        id: 'f_new2',
+        text: { en: "If you were invisible, would you go peeping?", ja: "もし透明人間になれたら、まず誰かのぞきに行く？" },
+        category: 'funny'
+    },
+    {
+        id: 'f_new3',
+        text: { en: "Can you still say your first love's full name?", ja: "初恋の人の名前を、今でもフルネームで言える？" },
+        category: 'romance'
     },
     {
         id: 'f2',
@@ -62,18 +72,8 @@ export const QUESTIONS: Question[] = [
         category: 'funny'
     },
     {
-        id: 'f4',
-        text: { en: "Have you ever blamed a fart on someone else?", ja: "自分のおならを他人のせいにしたことがある？" },
-        category: 'funny'
-    },
-    {
         id: 'f5',
         text: { en: "Have you ever checked your partner's phone?", ja: "恋人のスマホを勝手に見たことがある？" },
         category: 'romance'
-    },
-    {
-        id: 'f6',
-        text: { en: "Do you talk to yourself when alone?", ja: "一人でいる時、声に出して独り言を言う？" },
-        category: 'funny'
     }
 ];
