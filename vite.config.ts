@@ -8,17 +8,20 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico', 'icon.svg'], // Keep svg as fallback or asset
+      injectRegister: 'auto',
+      includeAssets: ['favicon.ico', 'icon.svg', 'pwa-192x192.png', 'pwa-512x512.png'],
       manifest: {
         name: 'Lie Detector - Truth Pulse',
         short_name: 'Lie Detector',
         description: 'Detect lies using your heart rate!',
-        theme_color: '#1e293b', // Dark theme for neon look
+        theme_color: '#1e293b',
         background_color: '#1e293b',
         display: 'standalone',
         orientation: 'portrait',
-        id: '/', // Audit fix
+        id: '/',
         start_url: '/',
+        scope: '/',
+        categories: ['entertainment', 'games', 'medical'],
         icons: [
           {
             src: 'pwa-192x192.png',
@@ -33,9 +36,9 @@ export default defineConfig({
             purpose: 'any maskable'
           }
         ],
-        screenshots: [ // Audit fix (Placeholder for now, but crucial for install prompt)
+        screenshots: [
           {
-            src: 'pwa-512x512.png', // Re-using icon as placeholder if we don't have screenshots yet, or remove if strict
+            src: 'pwa-512x512.png',
             sizes: '512x512',
             type: 'image/png',
             form_factor: 'wide',
@@ -47,6 +50,39 @@ export default defineConfig({
             type: 'image/png',
             form_factor: 'narrow',
             label: 'Mobile Screen'
+          }
+        ]
+      },
+      workbox: {
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,json}'],
+        runtimeCaching: [
+          {
+            urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'google-fonts-cache',
+              expiration: {
+                maxEntries: 10,
+                maxAgeSeconds: 60 * 60 * 24 * 365
+              },
+              cacheableResponse: {
+                statuses: [0, 200]
+              }
+            }
+          },
+          {
+            urlPattern: /^https:\/\/fonts\.gstatic\.com\/.*/i,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'gstatic-fonts-cache',
+              expiration: {
+                maxEntries: 10,
+                maxAgeSeconds: 60 * 60 * 24 * 365
+              },
+              cacheableResponse: {
+                statuses: [0, 200]
+              }
+            }
           }
         ]
       }
