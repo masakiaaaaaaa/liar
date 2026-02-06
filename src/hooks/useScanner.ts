@@ -38,6 +38,15 @@ export const useScanner = ({ videoRef, active }: UseScannerProps) => {
                 setDataPoints([...bufferRef.current]);
                 setSqi(newSqi);
             } else if (type === 'BPM_UPDATE') {
+                // QUALITY GATE: Only update display if confidence is above threshold
+                // This prevents showing unreliable numbers during poor signal quality
+                const CONFIDENCE_THRESHOLD = 30;
+
+                if (payload.confidence < CONFIDENCE_THRESHOLD) {
+                    // Poor quality - don't update displayed values, keep previous
+                    return;
+                }
+
                 // Smooth BPM
                 const alpha = 0.2;
                 setBpm(prev => {
