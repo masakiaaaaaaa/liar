@@ -20,18 +20,41 @@ export const useCamera = ({ active }: UseCameraProps) => {
 
         try {
             // Check if torch is supported
-            const capabilities = track.getCapabilities?.();
-            if (!capabilities || !('torch' in capabilities)) {
-                console.warn('Torch not supported by this device/browser');
-                return false;
+            const capabilities = track.getCapabilities?.() || {};
+            // Log capabilities for debugging
+            console.log('Camera Capabilities:', JSON.stringify(capabilities));
+
+            // Strategy 1: Standard Constraints (Chrome Android)
+            if ('torch' in capabilities) {
+                await track.applyConstraints({
+                    advanced: [{ torch: enabled } as MediaTrackConstraintSet]
+                });
+                console.log(`Torch (Constraints) ${enabled ? 'ON' : 'OFF'}`);
+                return true;
             }
 
-            // Apply torch constraint
-            await track.applyConstraints({
-                advanced: [{ torch: enabled } as MediaTrackConstraintSet]
-            });
-            console.log(`Torch ${enabled ? 'ON' : 'OFF'}`);
-            return true;
+            // Strategy 2: ImageCapture API (Older/Alternative Chrome)
+            // @ts-ignore - ImageCapture might not be in standard definitions
+            if (window.ImageCapture) {
+                try {
+                    // @ts-ignore
+                    const imageCapture = new ImageCapture(track);
+                    const photoCapabilities = await imageCapture.getPhotoCapabilities();
+
+                    if (photoCapabilities.fillLightMode && photoCapabilities.fillLightMode.includes('flash')) {
+                        await track.applyConstraints({
+                            advanced: [{ torch: enabled } as MediaTrackConstraintSet]
+                        });
+                        console.log(`Torch (ImageCapture check passed) ${enabled ? 'ON' : 'OFF'}`);
+                        return true;
+                    }
+                } catch (e) {
+                    console.warn("ImageCapture check failed", e);
+                }
+            }
+
+            console.warn('Torch not supported by this device/browser (Capabilities check failed)');
+            return false;
         } catch (err) {
             console.error('Torch control failed:', err);
             return false;
@@ -62,7 +85,8 @@ export const useCamera = ({ active }: UseCameraProps) => {
 
                 if (videoRef.current) {
                     videoRef.current.srcObject = stream;
-                    videoRef.current.play();
+                    videoRef.current.playsInline = true; // IMPORTANT for iOS/Mobile
+                    videoRef.current.play().catch(e => console.error("Play error:", e));
 
                     // Wait for video to actually start playing
                     videoRef.current.onloadedmetadata = () => {
