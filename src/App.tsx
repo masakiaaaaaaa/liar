@@ -69,7 +69,7 @@ function App() {
 
   const isCameraActive = gameState === 'SCANNING' || gameState === 'ANALYZING';
 
-  const { videoRef, ready, error } = useCamera({ active: isCameraActive });
+  const { videoRef, ready, error, brightness } = useCamera({ active: isCameraActive });
   const { init, toggle, on, fallbackMode } = useTorch();
   const { dataPoints, sqi, bpm, rmssd, peakCount, confidence } = useScanner({ videoRef, active: ready && isCameraActive });
 
@@ -583,6 +583,30 @@ function App() {
                   style={{ width: `${currentProgress}%`, background: isFingerDetected || gameState === 'ANALYZING' ? '#fff' : '#ccc' }}
                 />
               </div>
+            </div>
+          )}
+
+          {/* Brightness Warning */}
+          {(gameState === 'SCANNING') && brightness < 50 && (
+            <div
+              className="animate-fadeIn"
+              style={{
+                width: '100%',
+                padding: 'var(--space-sm) var(--space-md)',
+                background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
+                borderRadius: 'var(--radius-md)',
+                border: '2px solid #f59e0b',
+                textAlign: 'center',
+              }}
+            >
+              <p style={{
+                margin: 0,
+                fontSize: 'clamp(11px, 3vw, 13px)',
+                color: '#92400e',
+                fontWeight: 600,
+              }}>
+                💡 カメラが暗いです。明るい場所で試してください。
+              </p>
             </div>
           )}
 
