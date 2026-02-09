@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useTranslation, Trans } from 'react-i18next';
 import { useCamera } from './hooks/useCamera';
-import { useTorch } from './hooks/useTorch';
+// useTorch removed - now using useCamera's setTorch
 import { useScanner } from './hooks/useScanner';
 import { CameraView } from './components/Scanner/CameraView';
 import { WaveformCanvas } from './components/Scanner/WaveformCanvas';
@@ -69,8 +69,9 @@ function App() {
 
   const isCameraActive = gameState === 'SCANNING' || gameState === 'ANALYZING';
 
-  const { videoRef, ready, error } = useCamera({ active: isCameraActive });
-  const { init, toggle, on, fallbackMode } = useTorch();
+  const { videoRef, ready, error, setTorch } = useCamera({ active: isCameraActive });
+  const [torchOn, setTorchOn] = useState(false);
+  const [torchFallback, setTorchFallback] = useState(false);
   const { dataPoints, sqi, bpm, rmssd, peakCount, confidence } = useScanner({ videoRef, active: ready && isCameraActive });
 
   const [scanProgress, setScanProgress] = useState(0);
@@ -85,7 +86,17 @@ function App() {
   const latestPeakCount = useRef(0);
   const latestConfidence = useRef(0);
 
-  useEffect(() => { init(); }, [init]);
+  // Torch toggle helper
+  const toggleTorch = useCallback(async (desiredState: boolean) => {
+    const success = await setTorch(desiredState);
+    if (success) {
+      setTorchOn(desiredState);
+    } else {
+      // Fallback: torch not available, use screen light
+      setTorchFallback(true);
+      setTorchOn(desiredState);
+    }
+  }, [setTorch]);
 
 
   useEffect(() => {
@@ -138,7 +149,7 @@ function App() {
       HapticsManager.vibrateSelect();
       SoundManager.playActivate();
       SoundManager.startTensionBGM(); // Start dark tension BGM
-      toggle(true);
+      toggleTorch(true);
 
       // Reset
       setScanProgress(0);
@@ -187,7 +198,7 @@ function App() {
 
       return () => clearInterval(timer);
     } else if (gameState === 'ANALYZING') {
-      toggle(false);
+      toggleTorch(false);
       const analysisDuration = 2000;
       const analysisStart = Date.now();
 
@@ -219,9 +230,9 @@ function App() {
 
       return () => clearInterval(analysisTimer);
     } else {
-      toggle(false);
+      toggleTorch(false);
     }
-  }, [gameState, toggle]);
+  }, [gameState, toggleTorch]);
 
   useEffect(() => {
     if (gameState === 'RESULT' && resultRef.current) {
@@ -609,8 +620,8 @@ function App() {
                 <CameraView
                   videoRef={videoRef}
                   showPreview={true}
-                  fallbackMode={fallbackMode}
-                  torchOn={on}
+                  fallbackMode={torchFallback}
+                  torchOn={torchOn}
                 />
                 {gameState === 'SCANNING' && (
                   <ScannerOverlay progress={scanProgress} bpm={bpm} />
