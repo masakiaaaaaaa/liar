@@ -15,6 +15,7 @@ import { AdBanner } from './components/Monetization/AdBanner';
 import { HistoryStorage } from './core/storage/HistoryStorage';
 import { HistoryModal } from './components/History/HistoryModal';
 import { LegalFooter } from './components/LegalFooter';
+import { AboutSection } from './components/Content/AboutSection';
 import './index.css';
 import { QUESTIONS, type Question } from './core/content/questions';
 
@@ -532,6 +533,11 @@ function App() {
             </div>
           )}
 
+          {/* About / Content Section (IDLE) - AdSense compliance */}
+          {gameState === 'IDLE' && (
+            <AboutSection isJa={i18n.language === 'ja'} />
+          )}
+
           {/* Status Banner (SCANNING/ANALYZING) */}
           {(gameState === 'SCANNING' || gameState === 'ANALYZING') && (
             <div
@@ -819,9 +825,9 @@ function App() {
         )}
       </main>
 
-      {/* Ad Banner */}
+      {/* Ad Banner - Only show on screens with publisher content */}
       <LegalFooter />
-      <AdBanner />
+      {(gameState === 'IDLE' || gameState === 'RESULT') && <AdBanner />}
     </div>
   );
 }
